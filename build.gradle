@@ -12,6 +12,7 @@ buildscript {
     repositories {
         google()
         mavenCentral()
+        maven { url 'https://jitpack.io' }
     }
     dependencies {
         classpath "com.android.tools.build:gradle:$gradlePluginVersion"
@@ -23,9 +24,10 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+        maven { url 'https://jitpack.io' }
     }
 }
 
-task clean(type: Delete) {
+tasks.register('clean', Delete) {
     delete rootProject.buildDir
 }

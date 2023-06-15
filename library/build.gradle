@@ -30,8 +30,8 @@ dependencies {
 publishing {
     publications {
         release(MavenPublication) {
-            groupId = 'com.storytellerF'
-            artifactId = 'yong'
+            groupId = 'com.github.storytellerF'
+            artifactId = 'Yong'
             version = '1.0'
 
             afterEvaluate {
