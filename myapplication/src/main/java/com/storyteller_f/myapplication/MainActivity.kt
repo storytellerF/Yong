@@ -130,6 +130,7 @@ class MainActivity : AppCompatActivity() {
 
     fun test(e: Int) {
         println(e)
+        throw IOException("haha")
     }
 }
 

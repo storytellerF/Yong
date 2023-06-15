@@ -29,6 +29,7 @@ import org.jetbrains.uast.UCallExpression
 import org.jetbrains.uast.UClass
 import org.jetbrains.uast.UElement
 import org.jetbrains.uast.UMethod
+import org.jetbrains.uast.UThrowExpression
 import org.jetbrains.uast.UTryExpression
 import org.jetbrains.uast.kotlin.KotlinUBlockExpression
 import org.jetbrains.uast.kotlin.KotlinUFunctionCallExpression
@@ -42,10 +43,7 @@ private val UMethod.key: String
         return "${containingFile?.containingDirectory}-${containingClass?.qualifiedName}-${hierarchicalMethodSignature}"
     }
 
-/**
- * @param resolved 是否所有的自节点都访问完毕
- */
-abstract class Node(var resolved: Boolean) : Debug
+abstract class Node : Debug
 
 interface Named {
     val name: String
@@ -61,7 +59,7 @@ interface Debug {
     fun debugTree(): String = debug()
 }
 
-class RootNode(val activities: MutableList<ActivityNode>, resolved: Boolean) : Node(resolved) {
+class RootNode(val activities: MutableList<ActivityNode>) : Node() {
     override fun debug(): String {
         return "Root"
     }
@@ -69,23 +67,22 @@ class RootNode(val activities: MutableList<ActivityNode>, resolved: Boolean) : N
 }
 
 class ActivityNode(
-    override val methods: MutableList<MethodNode>, val key: ActivityKey, resolved: Boolean,
+    override val methods: MutableList<MethodNode>,
     override val name: String
 ) :
-    Node(resolved), Named, MethodContainer {
+    Node(), Named, MethodContainer {
     override fun debug(): String {
         return "Activity($name)"
     }
 }
 
 class MethodNode(
+    override val name: String,
+    val key: MethodKey,
+    val throws: MutableList<String>,
     val tryBlock: MutableList<TryCatchSubstitution>,
     override val methods: MutableList<MethodNode>,
-    val throws: MutableList<String>,
-    resolved: Boolean,
-    override val name: String,
-    val key: MethodKey
-) : Node(resolved), Named, MethodContainer {
+) : Node(), Named, MethodContainer {
     override fun debug(): String {
         return "Method($name)"
     }
@@ -94,13 +91,36 @@ class MethodNode(
         return debug() + " " + throws.joinToString()
     }
 
+    internal fun replace(
+        throws: Set<String>
+    ) {
+        this.throws.clear()
+        this.throws.addAll(throws.toMutableList())
+    }
+
+    internal fun throwList() =
+        throws.toSet() + methods.flatMap {
+            it.throws
+        }.toSet() + tryBlock.flatMap {
+            it.methods.flatMap { methodNode ->
+                methodNode.throws
+            }.toSet() - it.caught.toSet()
+        }.toSet()
+}
+
+/**
+ * 临时节点，用于判断当前visitMethod 是不是需要throw
+ */
+class ThrowNode: Node() {
+    override fun debug(): String {
+        return "Throw()"
+    }
 }
 
 class TryCatchSubstitution(
     val caught: MutableList<String>,
     override val methods: MutableList<MethodNode>,
-    resolved: Boolean
-) : Node(resolved), MethodContainer {
+) : Node(), MethodContainer {
     override fun debug(): String {
         return "try(${caught.joinToString()}{${
             methods.joinToString {
@@ -118,17 +138,13 @@ data class MethodKey(val key: String) {
     constructor(uMethod: UMethod) : this(uMethod.key)
 }
 
-data class ActivityKey(val key: String) {
-    constructor(uClass: UClass) : this(uClass.qualifiedName!!)
-}
-
 /**
  * Sample detector showing how to analyze Kotlin/Java code. This example
  * flags all string literals in the code that contain the word "lint".
  */
 @Suppress("UnstableApiUsage")
 class SampleCodeDetector : Detector(), UastScanner {
-    private val root = RootNode(mutableListOf(), false)
+    private val root = RootNode(mutableListOf())
     private val callStack = LinkedList<Node>(Collections.singleton(root))
 
     /**
@@ -154,7 +170,7 @@ class SampleCodeDetector : Detector(), UastScanner {
                     val throws = node.throwExceptions().toMutableList()
                     context.client.log(
                         Severity.IGNORE, null,
-                        "visitMethod ${node.name} ${throws.size} ${(node.uastBody as? KotlinUBlockExpression)?.expressions?.size} ${
+                        "${stackIndent()}visitMethod ${node.name} ${throws.size} ${(node.uastBody as? KotlinUBlockExpression)?.expressions?.size} ${
                             callStack.joinToString {
                                 it.debug()
                             }
@@ -162,12 +178,11 @@ class SampleCodeDetector : Detector(), UastScanner {
                     )
                     val cache = methodCache[key]
                     val methodNode = cache ?: MethodNode(
-                        mutableListOf(),
-                        mutableListOf(),
-                        throws,
-                        throws.isNotEmpty(),
                         node.name,
-                        key
+                        key,
+                        throws,
+                        mutableListOf(),
+                        mutableListOf(),
                     )
                     if (cache == null) {
                         methodCache[key] = methodNode
@@ -184,6 +199,12 @@ class SampleCodeDetector : Detector(), UastScanner {
                         is MethodNode -> {
                             current.methods.add(methodNode)
                         }
+                        is ThrowNode -> {
+                            callStack.popLast()
+                            val qualifiedName = node.containingClass?.qualifiedName!!
+                            (callStack.last as MethodNode).throws.add(qualifiedName)
+                            return true
+                        }
                     }
                     //如果返回true，afterVisitMethod 也会跳过
                     if (throws.isNotEmpty() || cache != null) return true
@@ -192,25 +213,22 @@ class SampleCodeDetector : Detector(), UastScanner {
                     return super.visitMethod(node)
                 }
 
+                private fun stackIndent(): String {
+                    return indent(callStack.size - 1)
+                }
+
                 override fun afterVisitMethod(node: UMethod) {
                     super.afterVisitMethod(node)
-                    context.client.log(Severity.IGNORE, null, "out method ${node.name}")
                     val current = callStack.popLast() as MethodNode
-                    val throws = current.methods.flatMap {
-                        it.throws
-                    }.toSet() + current.tryBlock.flatMap {
-                        it.methods.flatMap { methodNode ->
-                            methodNode.throws
-                        }.toSet() - it.caught.toSet()
-                    }
+                    context.client.log(Severity.IGNORE, null, "${stackIndent()}outMethod ${node.name}\n")
+                    val throws = current.throwList()
                     if (throws.isEmpty()) {
                         val pre = callStack.last
                         if (pre is MethodContainer) {
                             pre.methods.remove(current)
                         }
                     } else {
-                        current.throws.addAll(throws.toMutableList())
-                        current.resolved = true
+                        current.replace(throws)
                         if (callStack.size == 2) {
                             context.report(
                                 ISSUE, node, context.getLocation(node),
@@ -222,7 +240,7 @@ class SampleCodeDetector : Detector(), UastScanner {
                 }
 
                 override fun visitCallExpression(node: UCallExpression): Boolean {
-                    context.client.log(Severity.IGNORE, null, "\tcall ${node.methodName} $node")
+                    context.client.log(Severity.IGNORE, null, "${stackIndent()}call ${node.methodName} $node")
                     val current = callStack.last
                     if (node is KotlinUFunctionCallExpression) {
                         val uElement = node.resolveToUElement()
@@ -243,11 +261,22 @@ class SampleCodeDetector : Detector(), UastScanner {
                     return super.visitCallExpression(node)
                 }
 
+                override fun visitThrowExpression(node: UThrowExpression): Boolean {
+                    context.client.log(Severity.IGNORE, null, "${stackIndent()}visitThrow ${node.thrownExpression}")
+                    callStack.addLast(ThrowNode())
+                    return super.visitThrowExpression(node)
+                }
+
+                override fun afterVisitThrowExpression(node: UThrowExpression) {
+                    context.client.log(Severity.IGNORE, null, "${stackIndent()}outThrow")
+                    super.afterVisitThrowExpression(node)
+                }
+
                 override fun visitTryExpression(node: UTryExpression): Boolean {
                     val exceptions = node.safeExceptions().toMutableList()
-                    context.client.log(Severity.IGNORE, null, "\tenter try $node $exceptions")
+                    context.client.log(Severity.IGNORE, null, "${stackIndent()}visitTry $node $exceptions")
                     val tryCatchSubstitution =
-                        TryCatchSubstitution(exceptions, mutableListOf(), false)
+                        TryCatchSubstitution(exceptions, mutableListOf())
                     val current = callStack.last
                     if (current is MethodNode) {
                         current.tryBlock.add(tryCatchSubstitution)
@@ -258,8 +287,8 @@ class SampleCodeDetector : Detector(), UastScanner {
                 }
 
                 override fun afterVisitTryExpression(node: UTryExpression) {
-                    context.client.log(Severity.IGNORE, null, "\tout try $node")
                     val current = callStack.popLast() as TryCatchSubstitution
+                    context.client.log(Severity.IGNORE, null, "${stackIndent()}outTry $node")
                     val strings = current.methods.flatMap {
                         it.throws
                     }.toSet() - current.caught.toSet()
@@ -281,7 +310,7 @@ class SampleCodeDetector : Detector(), UastScanner {
                 if (isActivity) {
                     context.client.log(Severity.IGNORE, null, "visitClass ${node.qualifiedName}")
                     val activityNode =
-                        ActivityNode(mutableListOf(), ActivityKey(node), false, node.name!!)
+                        ActivityNode(mutableListOf(), node.name!!)
                     root.activities.add(activityNode)
                     callStack.addLast(activityNode)
                     node.methods.filter {
@@ -301,31 +330,32 @@ class SampleCodeDetector : Detector(), UastScanner {
                     null,
                     "${indent(step)}${node.debugTree()}"
                 )
+                val nextStep = step + 1
                 when (node) {
                     is RootNode -> {
                         node.activities.forEach {
-                            printTree(it, context, step + 1)
+                            printTree(it, context, nextStep)
                         }
                     }
 
                     is ActivityNode -> {
                         node.methods.forEach {
-                            printTree(it, context, step + 1)
+                            printTree(it, context, nextStep)
                         }
                     }
 
                     is MethodNode -> {
                         node.methods.forEach {
-                            printTree(it, context, step + 1)
+                            printTree(it, context, nextStep)
                         }
                         node.tryBlock.forEach {
-                            printTree(it, context, step + 1)
+                            printTree(it, context, nextStep)
                         }
                     }
 
                     is TryCatchSubstitution -> {
                         node.methods.forEach {
-                            printTree(it, context, step + 1)
+                            printTree(it, context, nextStep)
                         }
                     }
                 }
