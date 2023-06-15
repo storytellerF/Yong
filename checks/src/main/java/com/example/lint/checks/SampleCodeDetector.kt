@@ -205,9 +205,7 @@ class SampleCodeDetector : Detector(), UastScanner {
                     }
                     if (throws.isEmpty()) {
                         val pre = callStack.last
-                        if (pre is MethodNode) {
-                            pre.methods.remove(current)
-                        } else if (pre is TryCatchSubstitution) {
+                        if (pre is MethodContainer) {
                             pre.methods.remove(current)
                         }
                     } else {
@@ -277,17 +275,17 @@ class SampleCodeDetector : Detector(), UastScanner {
             }
 
             override fun visitClass(node: UClass) {
-                context.client.log(Severity.IGNORE, null, "visitClass ${node.qualifiedName}")
                 val isActivity = node.supers.any {
                     it.qualifiedName == "androidx.appcompat.app.AppCompatActivity"
                 }
                 if (isActivity) {
+                    context.client.log(Severity.IGNORE, null, "visitClass ${node.qualifiedName}")
                     val activityNode =
                         ActivityNode(mutableListOf(), ActivityKey(node), false, node.name!!)
                     root.activities.add(activityNode)
                     callStack.addLast(activityNode)
                     node.methods.filter {
-                        it.name == "onResume"
+                        it.findSuperMethods().isNotEmpty()
                     }.forEach {
                         it.accept(visitor)
                     }
@@ -351,10 +349,10 @@ class SampleCodeDetector : Detector(), UastScanner {
         @JvmField
         val ISSUE: Issue = Issue.create(
             // ID: used in @SuppressLint warnings etc
-            id = "SampleId",
+            id = "Yong",
             // Title -- shown in the IDE's preference dialog, as category headers in the
             // Analysis results window, etc
-            briefDescription = "Lint Mentions",
+            briefDescription = "Lint kotlin uncaught exceptions",
             // Full explanation of the issue; you can use some markdown markup such as
             // `monospace`, *italic*, and **bold**.
             explanation = """
