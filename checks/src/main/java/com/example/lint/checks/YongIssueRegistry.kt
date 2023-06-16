@@ -23,8 +23,8 @@ import com.android.tools.lint.detector.api.CURRENT_API
  * The list of issues that will be checked when running <code>lint</code>.
  */
 @Suppress("UnstableApiUsage")
-class SampleIssueRegistry : IssueRegistry() {
-    override val issues = listOf(SampleCodeDetector.ISSUE)
+class YongIssueRegistry : IssueRegistry() {
+    override val issues = listOf(KotlinUncaughtExceptionDetector.ISSUE)
 
     override val api: Int
         get() = CURRENT_API
@@ -35,8 +35,8 @@ class SampleIssueRegistry : IssueRegistry() {
     // Requires lint API 30.0+; if you're still building for something
     // older, just remove this property.
     override val vendor: Vendor = Vendor(
-        vendorName = "Android Open Source Project",
-        feedbackUrl = "https://github.com/googlesamples/android-custom-lint-rules/issues",
-        contact = "https://github.com/googlesamples/android-custom-lint-rules"
+        vendorName = "storytellerF",
+        feedbackUrl = "https://github.com/storytellerF/Yong/issues",
+        contact = "https://github.com/storytellerF/Yong"
     )
 }

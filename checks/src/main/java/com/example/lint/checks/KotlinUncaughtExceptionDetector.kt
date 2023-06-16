@@ -38,112 +38,12 @@ import org.jetbrains.uast.visitor.AbstractUastVisitor
 import java.util.Collections
 import java.util.LinkedList
 
-private val UMethod.key: String
-    get() {
-        return "${containingFile?.containingDirectory}-${containingClass?.qualifiedName}-${hierarchicalMethodSignature}"
-    }
-
-abstract class Node : Debug
-
-interface Named {
-    val name: String
-}
-
-interface MethodContainer {
-    val methods: MutableList<MethodNode>
-}
-
-interface Debug {
-    fun debug(): String
-
-    fun debugTree(): String = debug()
-}
-
-class RootNode(val activities: MutableList<ActivityNode>) : Node() {
-    override fun debug(): String {
-        return "Root"
-    }
-
-}
-
-class ActivityNode(
-    override val methods: MutableList<MethodNode>,
-    override val name: String
-) :
-    Node(), Named, MethodContainer {
-    override fun debug(): String {
-        return "Activity($name)"
-    }
-}
-
-class MethodNode(
-    override val name: String,
-    val key: MethodKey,
-    val throws: MutableList<String>,
-    val tryBlock: MutableList<TryCatchSubstitution>,
-    override val methods: MutableList<MethodNode>,
-) : Node(), Named, MethodContainer {
-    override fun debug(): String {
-        return "Method($name)"
-    }
-
-    override fun debugTree(): String {
-        return debug() + " " + throws.joinToString()
-    }
-
-    internal fun replace(
-        throws: Set<String>
-    ) {
-        this.throws.clear()
-        this.throws.addAll(throws.toMutableList())
-    }
-
-    internal fun throwList() =
-        throws.toSet() + methods.flatMap {
-            it.throws
-        }.toSet() + tryBlock.flatMap {
-            it.methods.flatMap { methodNode ->
-                methodNode.throws
-            }.toSet() - it.caught.toSet()
-        }.toSet()
-}
-
-/**
- * 临时节点，用于判断当前visitMethod 是不是需要throw
- */
-class ThrowNode: Node() {
-    override fun debug(): String {
-        return "Throw()"
-    }
-}
-
-class TryCatchSubstitution(
-    val caught: MutableList<String>,
-    override val methods: MutableList<MethodNode>,
-) : Node(), MethodContainer {
-    override fun debug(): String {
-        return "try(${caught.joinToString()}{${
-            methods.joinToString {
-                it.debug()
-            }
-        })"
-    }
-
-    override fun debugTree(): String {
-        return "try(${caught.joinToString()})"
-    }
-}
-
-data class MethodKey(val key: String) {
-    constructor(uMethod: UMethod) : this(uMethod.key)
-}
-
 /**
  * Sample detector showing how to analyze Kotlin/Java code. This example
  * flags all string literals in the code that contain the word "lint".
  */
 @Suppress("UnstableApiUsage")
-class SampleCodeDetector : Detector(), UastScanner {
+class KotlinUncaughtExceptionDetector : Detector(), UastScanner {
     private val root = RootNode(mutableListOf())
     private val callStack = LinkedList<Node>(Collections.singleton(root))
 
@@ -155,7 +55,6 @@ class SampleCodeDetector : Detector(), UastScanner {
     override fun getApplicableUastTypes(): List<Class<out UElement?>> {
         return listOf(UClass::class.java)
     }
-
 
     override fun createUastHandler(context: JavaContext): UElementHandler {
         return object : UElementHandler() {
@@ -323,49 +222,6 @@ class SampleCodeDetector : Detector(), UastScanner {
                 }
 
             }
-
-            private fun printTree(node: Node, context: JavaContext, step: Int) {
-                context.client.log(
-                    Severity.INFORMATIONAL,
-                    null,
-                    "${indent(step)}${node.debugTree()}"
-                )
-                val nextStep = step + 1
-                when (node) {
-                    is RootNode -> {
-                        node.activities.forEach {
-                            printTree(it, context, nextStep)
-                        }
-                    }
-
-                    is ActivityNode -> {
-                        node.methods.forEach {
-                            printTree(it, context, nextStep)
-                        }
-                    }
-
-                    is MethodNode -> {
-                        node.methods.forEach {
-                            printTree(it, context, nextStep)
-                        }
-                        node.tryBlock.forEach {
-                            printTree(it, context, nextStep)
-                        }
-                    }
-
-                    is TryCatchSubstitution -> {
-                        node.methods.forEach {
-                            printTree(it, context, nextStep)
-                        }
-                    }
-                }
-            }
-
-            private fun indent(step: Int): String {
-                return List(step) {
-                    "\t"
-                }.joinToString("")
-            }
         }
     }
 
@@ -386,16 +242,14 @@ class SampleCodeDetector : Detector(), UastScanner {
             // Full explanation of the issue; you can use some markdown markup such as
             // `monospace`, *italic*, and **bold**.
             explanation = """
-                    This check highlights string literals in code which mentions the word `lint`. \
-                    Blah blah blah.
-
-                    Another paragraph here.
+                    Uncaught exception may cause app crash.\
+                    Should use `try-catch`.
                     """, // no need to .trimIndent(), lint does that automatically
             category = Category.CORRECTNESS,
             priority = 6,
             severity = Severity.WARNING,
             implementation = Implementation(
-                SampleCodeDetector::class.java,
+                KotlinUncaughtExceptionDetector::class.java,
                 Scope.JAVA_FILE_SCOPE
             )
         )
