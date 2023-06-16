@@ -43,197 +43,29 @@ import java.util.LinkedList
  * Sample detector showing how to analyze Kotlin/Java code. This example
  * flags all string literals in the code that contain the word "lint".
  */
-@Suppress("UnstableApiUsage")
 class KotlinUncaughtExceptionDetector : Detector(), UastScanner {
-    private val root = RootNode(mutableListOf())
-    private val callStack = LinkedList<Node>(Collections.singleton(root))
 
-    /**
-     * 存储访问过的所有method
-     */
-    private val methodCache = mutableMapOf<MethodKey, MethodNode>()
 
     override fun getApplicableUastTypes(): List<Class<out UElement?>> {
         return listOf(UClass::class.java)
     }
 
     override fun createUastHandler(context: JavaContext): UElementHandler {
+        val resolution = StackResolution(context)
         return object : UElementHandler() {
-            val visitor = object : AbstractUastVisitor() {
-                override fun visitMethod(node: UMethod): Boolean {
-                    val key = node.methodKey()
-                    if (callStack.any {
-                            it is MethodNode && it.key == key
-                        }) {
-                        return true
-                    }
-                    val throws = node.throwExceptions().toMutableList()
-                    context.client.log(
-                        Severity.IGNORE, null,
-                        "${stackIndent()}visitMethod ${node.name} ${throws.size} ${(node.uastBody as? KotlinUBlockExpression)?.expressions?.size} ${
-                            callStack.joinToString {
-                                it.debug()
-                            }
-                        }"
-                    )
-                    val cache = methodCache[key]
-                    val methodNode = cache ?: MethodNode(
-                        node.name,
-                        key,
-                        throws
-                    )
-                    if (cache == null) {
-                        methodCache[key] = methodNode
-                    }
-                    (callStack.last as MethodContainer).methods.add(methodNode)
-
-                    //如果返回true，afterVisitMethod 也会跳过
-                    if (throws.isNotEmpty() || cache != null) return true
-                    callStack.addLast(methodNode)
-
-                    return super.visitMethod(node)
-                }
-
-                private fun stackIndent(): String {
-                    return indent(callStack.size - 1)
-                }
-
-                override fun afterVisitMethod(node: UMethod) {
-                    super.afterVisitMethod(node)
-                    val current = callStack.popLast() as MethodNode
-                    if (node.isConstructorCall()) {
-                        val pre = callStack.last
-                        if (pre is ThrowNode) {
-                            assert(node.isConstructorCall())
-                            val qualifiedName = node.containingClass?.qualifiedName!!
-                            current.throws.add(qualifiedName)
-                        }
-                    }
-                    context.client.log(
-                        Severity.IGNORE,
-                        null,
-                        "${stackIndent()}outMethod ${node.name}\n"
-                    )
-                    val throws = current.throwList()
-                    if (throws.isEmpty()) {
-                        val pre = callStack.last
-                        if (pre is MethodContainer) {
-                            pre.methods.remove(current)
-                        }
-                    } else {
-                        current.replace(throws)
-                        if (callStack.size == 2) {
-                            context.report(
-                                ISSUE, node, context.getLocation(node),
-                                "uncaught exception ${throws.joinToString()}"
-                            )
-                        }
-                    }
-
-                }
-
-                override fun visitCallExpression(node: UCallExpression): Boolean {
-                    context.client.log(
-                        Severity.IGNORE,
-                        null,
-                        "${stackIndent()}call ${node.methodName} $node"
-                    )
-                    val current = callStack.last
-                    if (node is KotlinUFunctionCallExpression) {
-                        val uElement = node.resolveToUElement()
-                        if (uElement != null) {
-                            if (uElement is UMethod) {
-                                val key = uElement.methodKey()
-                                val methodNode = methodCache[key]
-                                if (methodNode != null) {
-                                    if (current is MethodNode) {
-                                        current.methods.add(methodNode)
-                                    }
-                                } else {
-                                    uElement.accept(this)
-                                }
-                            }
-                        }
-                    }
-                    return super.visitCallExpression(node)
-                }
-
-                override fun visitThrowExpression(node: UThrowExpression): Boolean {
-                    context.client.log(
-                        Severity.IGNORE,
-                        null,
-                        "${stackIndent()}visitThrow ${node.thrownExpression}"
-                    )
-                    val current = callStack.last
-                    val throwNode = ThrowNode()
-                    (current as MethodNode).throwNodes.add(throwNode)
-                    callStack.addLast(throwNode)
-                    return super.visitThrowExpression(node)
-                }
-
-                override fun afterVisitThrowExpression(node: UThrowExpression) {
-                    context.client.log(Severity.IGNORE, null, "${stackIndent()}outThrow")
-                    callStack.popLast()
-                    super.afterVisitThrowExpression(node)
-                }
-
-                override fun visitTryExpression(node: UTryExpression): Boolean {
-                    val exceptions = node.safeExceptions().toMutableList()
-                    context.client.log(
-                        Severity.IGNORE,
-                        null,
-                        "${stackIndent()}visitTry $node $exceptions"
-                    )
-                    val tryCatchSubstitution =
-                        TryCatchSubstitution(exceptions)
-                    val current = callStack.last
-                    (current as MethodNode).tryBlock.add(tryCatchSubstitution)
-                    callStack.addLast(tryCatchSubstitution)
-
-                    return super.visitTryExpression(node)
-                }
-
-                override fun afterVisitTryExpression(node: UTryExpression) {
-                    val current = callStack.popLast() as TryCatchSubstitution
-                    context.client.log(Severity.IGNORE, null, "${stackIndent()}outTry $node")
-                    val throws = current.methods.flatMap {
-                        it.throws
-                    }.toSet() - current.caught.toSet()
-                    if (throws.isEmpty()) {
-                        val pre = callStack.last
-                        if (pre is MethodNode) {
-                            pre.tryBlock.remove(current)
-                        }
-                    }
-                    super.afterVisitTryExpression(node)
-                }
-
-            }
 
             override fun visitClass(node: UClass) {
                 val isActivity = node.supers.any {
                     it.qualifiedName == "androidx.appcompat.app.AppCompatActivity"
                 }
                 if (isActivity) {
-                    context.client.log(Severity.IGNORE, null, "visitClass ${node.qualifiedName}")
-                    val activityNode =
-                        ActivityNode(mutableListOf(), node.name!!)
-                    root.activities.add(activityNode)
-                    callStack.addLast(activityNode)
-                    node.methods.filter {
-                        it.findSuperMethods().isNotEmpty()
-                    }.forEach {
-                        it.accept(visitor)
-                    }
-                    callStack.removeLast()
-                    printTree(root, context, 0)
+                    resolution.start(node)
                 }
 
             }
         }
     }
 
-    private fun UMethod.methodKey() = MethodKey(this)
 
     companion object {
         /**

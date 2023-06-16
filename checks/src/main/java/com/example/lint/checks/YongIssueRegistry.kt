@@ -22,7 +22,6 @@ import com.android.tools.lint.detector.api.CURRENT_API
 /*
  * The list of issues that will be checked when running <code>lint</code>.
  */
-@Suppress("UnstableApiUsage")
 class YongIssueRegistry : IssueRegistry() {
     override val issues = listOf(KotlinUncaughtExceptionDetector.ISSUE)
 
