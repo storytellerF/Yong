@@ -34,6 +34,7 @@ import org.jetbrains.uast.UTryExpression
 import org.jetbrains.uast.kotlin.KotlinUBlockExpression
 import org.jetbrains.uast.kotlin.KotlinUFunctionCallExpression
 import org.jetbrains.uast.resolveToUElement
+import org.jetbrains.uast.util.isConstructorCall
 import org.jetbrains.uast.visitor.AbstractUastVisitor
 import java.util.Collections
 import java.util.LinkedList
@@ -79,32 +80,13 @@ class KotlinUncaughtExceptionDetector : Detector(), UastScanner {
                     val methodNode = cache ?: MethodNode(
                         node.name,
                         key,
-                        throws,
-                        mutableListOf(),
-                        mutableListOf(),
+                        throws
                     )
                     if (cache == null) {
                         methodCache[key] = methodNode
                     }
-                    when (val current = callStack.last) {
-                        is ActivityNode -> {
-                            current.methods.add(methodNode)
-                        }
+                    (callStack.last as MethodContainer).methods.add(methodNode)
 
-                        is TryCatchSubstitution -> {
-                            current.methods.add(methodNode)
-                        }
-
-                        is MethodNode -> {
-                            current.methods.add(methodNode)
-                        }
-                        is ThrowNode -> {
-                            callStack.popLast()
-                            val qualifiedName = node.containingClass?.qualifiedName!!
-                            (callStack.last as MethodNode).throws.add(qualifiedName)
-                            return true
-                        }
-                    }
                     //如果返回true，afterVisitMethod 也会跳过
                     if (throws.isNotEmpty() || cache != null) return true
                     callStack.addLast(methodNode)
@@ -119,7 +101,19 @@ class KotlinUncaughtExceptionDetector : Detector(), UastScanner {
                 override fun afterVisitMethod(node: UMethod) {
                     super.afterVisitMethod(node)
                     val current = callStack.popLast() as MethodNode
-                    context.client.log(Severity.IGNORE, null, "${stackIndent()}outMethod ${node.name}\n")
+                    if (node.isConstructorCall()) {
+                        val pre = callStack.last
+                        if (pre is ThrowNode) {
+                            assert(node.isConstructorCall())
+                            val qualifiedName = node.containingClass?.qualifiedName!!
+                            current.throws.add(qualifiedName)
+                        }
+                    }
+                    context.client.log(
+                        Severity.IGNORE,
+                        null,
+                        "${stackIndent()}outMethod ${node.name}\n"
+                    )
                     val throws = current.throwList()
                     if (throws.isEmpty()) {
                         val pre = callStack.last
@@ -139,7 +133,11 @@ class KotlinUncaughtExceptionDetector : Detector(), UastScanner {
                 }
 
                 override fun visitCallExpression(node: UCallExpression): Boolean {
-                    context.client.log(Severity.IGNORE, null, "${stackIndent()}call ${node.methodName} $node")
+                    context.client.log(
+                        Severity.IGNORE,
+                        null,
+                        "${stackIndent()}call ${node.methodName} $node"
+                    )
                     val current = callStack.last
                     if (node is KotlinUFunctionCallExpression) {
                         val uElement = node.resolveToUElement()
@@ -161,26 +159,36 @@ class KotlinUncaughtExceptionDetector : Detector(), UastScanner {
                 }
 
                 override fun visitThrowExpression(node: UThrowExpression): Boolean {
-                    context.client.log(Severity.IGNORE, null, "${stackIndent()}visitThrow ${node.thrownExpression}")
-                    callStack.addLast(ThrowNode())
+                    context.client.log(
+                        Severity.IGNORE,
+                        null,
+                        "${stackIndent()}visitThrow ${node.thrownExpression}"
+                    )
+                    val current = callStack.last
+                    val throwNode = ThrowNode()
+                    (current as MethodNode).throwNodes.add(throwNode)
+                    callStack.addLast(throwNode)
                     return super.visitThrowExpression(node)
                 }
 
                 override fun afterVisitThrowExpression(node: UThrowExpression) {
                     context.client.log(Severity.IGNORE, null, "${stackIndent()}outThrow")
+                    callStack.popLast()
                     super.afterVisitThrowExpression(node)
                 }
 
                 override fun visitTryExpression(node: UTryExpression): Boolean {
                     val exceptions = node.safeExceptions().toMutableList()
-                    context.client.log(Severity.IGNORE, null, "${stackIndent()}visitTry $node $exceptions")
+                    context.client.log(
+                        Severity.IGNORE,
+                        null,
+                        "${stackIndent()}visitTry $node $exceptions"
+                    )
                     val tryCatchSubstitution =
-                        TryCatchSubstitution(exceptions, mutableListOf())
+                        TryCatchSubstitution(exceptions)
                     val current = callStack.last
-                    if (current is MethodNode) {
-                        current.tryBlock.add(tryCatchSubstitution)
-                        callStack.addLast(tryCatchSubstitution)
-                    }
+                    (current as MethodNode).tryBlock.add(tryCatchSubstitution)
+                    callStack.addLast(tryCatchSubstitution)
 
                     return super.visitTryExpression(node)
                 }
@@ -188,10 +196,10 @@ class KotlinUncaughtExceptionDetector : Detector(), UastScanner {
                 override fun afterVisitTryExpression(node: UTryExpression) {
                     val current = callStack.popLast() as TryCatchSubstitution
                     context.client.log(Severity.IGNORE, null, "${stackIndent()}outTry $node")
-                    val strings = current.methods.flatMap {
+                    val throws = current.methods.flatMap {
                         it.throws
                     }.toSet() - current.caught.toSet()
-                    if (strings.isEmpty()) {
+                    if (throws.isEmpty()) {
                         val pre = callStack.last
                         if (pre is MethodNode) {
                             pre.tryBlock.remove(current)

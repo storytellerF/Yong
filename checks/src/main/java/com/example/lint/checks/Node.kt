@@ -45,9 +45,10 @@ class ActivityNode(
 class MethodNode(
     override val name: String,
     val key: MethodKey,
-    val throws: MutableList<String>,
-    val tryBlock: MutableList<TryCatchSubstitution>,
-    override val methods: MutableList<MethodNode>,
+    val throws: MutableList<String> = mutableListOf(),
+    val throwNodes: MutableList<ThrowNode> = mutableListOf(),
+    val tryBlock: MutableList<TryCatchSubstitution> = mutableListOf(),
+    override val methods: MutableList<MethodNode> = mutableListOf(),
 ) : Node(), Named, MethodContainer {
     override fun debug(): String {
         return "Method($name)"
@@ -64,28 +65,39 @@ class MethodNode(
         this.throws.addAll(throws.toMutableList())
     }
 
-    internal fun throwList() =
-        throws.toSet() + methods.flatMap {
-            it.throws
-        }.toSet() + tryBlock.flatMap {
-            it.methods.flatMap { methodNode ->
-                methodNode.throws
-            }.toSet() - it.caught.toSet()
+    internal fun throwList(): Set<String> {
+        val nodeThrows = throwNodes.flatMap {
+            it.throwList()
         }.toSet()
+        val methodThrows = methods.flatMap {
+            it.throws
+        }.toSet()
+        val tryLeak = tryBlock.flatMap {
+            it.throwList()
+        }.toSet()
+        return throws.toSet() + nodeThrows + methodThrows + tryLeak
+    }
 }
 
 /**
  * 临时节点，用于判断当前visitMethod 是不是需要throw
+ * 虽然是methodNode，但是执行的是初始化操作。
  */
-class ThrowNode: Node() {
+class ThrowNode(override val methods: MutableList<MethodNode> = mutableListOf()): Node(), MethodContainer {
     override fun debug(): String {
         return "Throw()"
+    }
+
+    fun throwList(): List<String> {
+        return methods.flatMap { node ->
+            node.throwList()
+        }
     }
 }
 
 class TryCatchSubstitution(
     val caught: MutableList<String>,
-    override val methods: MutableList<MethodNode>,
+    override val methods: MutableList<MethodNode> = mutableListOf(),
 ) : Node(), MethodContainer {
     override fun debug(): String {
         return "try(${caught.joinToString()}{${
@@ -97,6 +109,12 @@ class TryCatchSubstitution(
 
     override fun debugTree(): String {
         return "try(${caught.joinToString()})"
+    }
+
+    fun throwList(): Set<String> {
+        return methods.flatMap { methodNode ->
+            methodNode.throws
+        }.toSet() - caught.toSet()
     }
 }
 
