@@ -24,20 +24,8 @@ import com.android.tools.lint.detector.api.Issue
 import com.android.tools.lint.detector.api.JavaContext
 import com.android.tools.lint.detector.api.Scope
 import com.android.tools.lint.detector.api.Severity
-import org.jetbrains.kotlin.utils.addToStdlib.popLast
-import org.jetbrains.uast.UCallExpression
 import org.jetbrains.uast.UClass
 import org.jetbrains.uast.UElement
-import org.jetbrains.uast.UMethod
-import org.jetbrains.uast.UThrowExpression
-import org.jetbrains.uast.UTryExpression
-import org.jetbrains.uast.kotlin.KotlinUBlockExpression
-import org.jetbrains.uast.kotlin.KotlinUFunctionCallExpression
-import org.jetbrains.uast.resolveToUElement
-import org.jetbrains.uast.util.isConstructorCall
-import org.jetbrains.uast.visitor.AbstractUastVisitor
-import java.util.Collections
-import java.util.LinkedList
 
 /**
  * Sample detector showing how to analyze Kotlin/Java code. This example
@@ -87,7 +75,7 @@ class KotlinUncaughtExceptionDetector : Detector(), UastScanner {
                     """, // no need to .trimIndent(), lint does that automatically
             category = Category.CORRECTNESS,
             priority = 6,
-            severity = Severity.WARNING,
+            severity = Severity.ERROR,
             implementation = Implementation(
                 KotlinUncaughtExceptionDetector::class.java,
                 Scope.JAVA_FILE_SCOPE

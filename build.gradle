@@ -1,6 +1,6 @@
 buildscript {
     ext {
-        kotlinVersion = '1.8.20'
+        kotlinVersion = '1.8.21'
         // Current release: Flamingo / AGP 8.0
         gradlePluginVersion = '8.0.2'
         lintVersion = '31.0.2'

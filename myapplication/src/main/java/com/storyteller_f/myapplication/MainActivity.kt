@@ -106,14 +106,14 @@ class MainActivity : AppCompatActivity() {
     /**
      * 这里应该掠过检查
      */
-    fun middle() {
+    private fun middle() {
         throwException()
     }
 
     /**
      * 只有这里才需要判断
      */
-    fun hello() {
+    private fun hello() {
         try {
             middle()
         } catch (_: IOException) {
@@ -124,11 +124,12 @@ class MainActivity : AppCompatActivity() {
     /**
      * 需要提供一个错误
      */
-    fun test() {
+    private fun test() {
         middle()
     }
 
-    fun test(e: Int) {
+    @Suppress("SameParameterValue")
+    private fun test(e: Int) {
         println(e)
         throw IOException("haha")
     }
