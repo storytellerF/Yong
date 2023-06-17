@@ -66,13 +66,19 @@ class ThrowableDefinition(val name: String, val children: MutableList<ThrowableD
 
         fun throwableDefinition(psiClass: PsiClass) = throwableDefinition(psiClass) {
             val list = mutableListOf<String>()
-            var su = psiClass.containingClass?.superClass!!
-            while (true) {
-                list.add(su.qualifiedName!!)
-                val superClass = su.superClass ?: break
-                su = superClass
+            val directSuperClass = psiClass.containingClass?.superClass
+            if (directSuperClass != null) {
+                var su: PsiClass = directSuperClass
+                while (true) {
+                    list.add(su.qualifiedName!!)
+                    val superClass = su.superClass ?: break
+                    su = superClass
+                }
+                list.subList(0, list.size - 2)
+            } else {
+                emptyList()
             }
-            list.subList(0, list.size - 2)
+
         }
 
         private fun throwableDefinition(psiClass: PsiClass, supers: (PsiClass) -> List<String>): ThrowableDefinition {

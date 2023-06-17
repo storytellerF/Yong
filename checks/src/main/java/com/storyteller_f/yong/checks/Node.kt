@@ -25,9 +25,16 @@ interface Debug {
     fun debugTree(): String = debug()
 }
 
-class RootNode(val activities: MutableList<ActivityNode>) : Node() {
+class RootNode(val activities: MutableList<ActivityNode> = mutableListOf(), val entranceNodes: MutableList<EntranceNode> = mutableListOf()) : Node() {
     override fun debug(): String {
         return "Root"
+    }
+
+}
+
+class EntranceNode(override val methods: MutableList<MethodNode>, override val name: String): Node(), Named, MethodContainer {
+    override fun debug(): String {
+        return "Entrance($name)"
     }
 
 }
@@ -145,6 +152,9 @@ internal fun printTree(node: Node, context: JavaContext, step: Int) {
     when (node) {
         is RootNode -> {
             node.activities.forEach {
+                printTree(it, context, nextStep)
+            }
+            node.entranceNodes.forEach {
                 printTree(it, context, nextStep)
             }
         }

@@ -1,6 +1,7 @@
 package com.storyteller_f.yong.checks
 
 import com.intellij.psi.PsiClassType
+import com.intellij.psi.PsiType
 import org.jetbrains.uast.UMethod
 import org.jetbrains.uast.UTryExpression
 
@@ -19,3 +20,6 @@ fun UMethod.throwExceptions(): List<ThrowableDefinition> {
 }
 
 internal fun UMethod.methodKey() = MethodKey(this)
+
+internal fun UMethod.isMainMethod() =
+    name == "main" && isStatic && returnType == PsiType.VOID

@@ -3,6 +3,7 @@ package com.storyteller_f.yong.checks.resolution
 import com.android.tools.lint.detector.api.JavaContext
 import com.android.tools.lint.detector.api.Severity
 import com.storyteller_f.yong.checks.ActivityNode
+import com.storyteller_f.yong.checks.EntranceNode
 import com.storyteller_f.yong.checks.KotlinUncaughtExceptionDetector
 import com.storyteller_f.yong.checks.MethodContainer
 import com.storyteller_f.yong.checks.MethodKey
@@ -13,6 +14,7 @@ import com.storyteller_f.yong.checks.ThrowNode
 import com.storyteller_f.yong.checks.ThrowableDefinition
 import com.storyteller_f.yong.checks.TryCatchSubstitution
 import com.storyteller_f.yong.checks.indent
+import com.storyteller_f.yong.checks.isMainMethod
 import com.storyteller_f.yong.checks.methodKey
 import com.storyteller_f.yong.checks.printTree
 import com.storyteller_f.yong.checks.safeExceptions
@@ -32,7 +34,7 @@ import java.util.LinkedList
 
 class StackResolution(val context: JavaContext) {
 
-    private val root = RootNode(mutableListOf())
+    private val root = RootNode()
     private val callStack = LinkedList<Node>(Collections.singleton(root))
 
     /**
@@ -50,7 +52,6 @@ class StackResolution(val context: JavaContext) {
                 return true
             }
             val last = callStack.last
-            if (last is ActivityNode && node.findSuperMethods().isEmpty()) return true
             /*
              * 判断是否是调用了Exception 构造函数
              */
@@ -83,7 +84,11 @@ class StackResolution(val context: JavaContext) {
             if (cache == null) {
                 resolvedMethodCache[key] = methodNode
             }
-            (last as MethodContainer).methods.add(methodNode)
+            if (last is ActivityNode && node.findSuperMethods().isNotEmpty() ||
+                last is EntranceNode && node.isMainMethod() ||
+                last !is ActivityNode && last !is EntranceNode
+            )
+                (last as MethodContainer).methods.add(methodNode)
 
             //如果返回true，afterVisitMethod 也会跳过
             if (throws.isNotEmpty() || cache != null) return true
@@ -105,14 +110,13 @@ class StackResolution(val context: JavaContext) {
                 null,
                 "${stackIndent()}outMethod ${node.name} ${throws.size}"
             )
-            if ((callStack.last as? MethodContainer)?.methods?.isNotEmpty() == true) {
+            val pre = callStack.last
+            if (((pre as? MethodContainer)?.methods?.size ?: 0) > 1) {
                 context.client.log(Severity.IGNORE, null, "")
             }
-            if (throws.isEmpty()) {
-                val pre = callStack.last
-                (pre as MethodContainer).methods.remove(current)
-            } else {
-                if (callStack.size == 2) {
+            when {
+                throws.isEmpty() -> (pre as MethodContainer).methods.remove(current)
+                pre is ActivityNode || pre is EntranceNode -> {
                     context.report(
                         KotlinUncaughtExceptionDetector.ISSUE, node, context.getLocation(node),
                         "uncaught exception ${throws.joinToString()}"
@@ -161,8 +165,12 @@ class StackResolution(val context: JavaContext) {
         }
 
         override fun afterVisitThrowExpression(node: UThrowExpression) {
-            callStack.popLast()
-            context.client.log(Severity.IGNORE, null, "${stackIndent()}outThrow")
+            val current = callStack.popLast() as ThrowNode
+            context.client.log(
+                Severity.IGNORE,
+                null,
+                "${stackIndent()}outThrow ${current.throwList()}"
+            )
             super.afterVisitThrowExpression(node)
         }
 
@@ -193,14 +201,25 @@ class StackResolution(val context: JavaContext) {
 
         override fun visitClass(node: UClass): Boolean {
             context.client.log(Severity.IGNORE, null, "visitClass ${node.qualifiedName}")
-            val activityNode = ActivityNode(mutableListOf(), node.name!!)
-            root.activities.add(activityNode)
-            callStack.addLast(activityNode)
+            val isActivity = node.supers.any {
+                it.qualifiedName == "androidx.appcompat.app.AppCompatActivity"
+            }
+            val name = node.name!!
+            if (isActivity) {
+                val activityNode = ActivityNode(mutableListOf(), name)
+                root.activities.add(activityNode)
+                callStack.addLast(activityNode)
+            } else {
+                val entranceNode = EntranceNode(mutableListOf(), name)
+                root.entranceNodes.add(entranceNode)
+                callStack.addLast(entranceNode)
+            }
             return super.visitClass(node)
         }
 
         override fun afterVisitClass(node: UClass) {
             super.afterVisitClass(node)
+            context.client.log(Severity.IGNORE, null, "outClass ${node.qualifiedName}")
             callStack.removeLast()
             printTree(root, context, 0)
             printTree(ThrowableDefinition.rootDefinition, context, 0)

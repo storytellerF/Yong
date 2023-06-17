@@ -47,14 +47,18 @@ class KotlinUncaughtExceptionDetector : Detector(), UastScanner {
                 val isActivity = node.supers.any {
                     it.qualifiedName == "androidx.appcompat.app.AppCompatActivity"
                 }
+                val hasMainMethod = node.methods.any {
+                    it.isMainMethod()
+                }
                 if (isActivity) {
+                    resolution.start(node)
+                } else if (hasMainMethod) {
                     resolution.start(node)
                 }
 
             }
         }
     }
-
 
     companion object {
         /**
