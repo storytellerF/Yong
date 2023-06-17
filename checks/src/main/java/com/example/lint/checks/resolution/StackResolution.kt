@@ -1,7 +1,21 @@
-package com.example.lint.checks
+package com.example.lint.checks.resolution
 
 import com.android.tools.lint.detector.api.JavaContext
 import com.android.tools.lint.detector.api.Severity
+import com.example.lint.checks.ActivityNode
+import com.example.lint.checks.KotlinUncaughtExceptionDetector
+import com.example.lint.checks.MethodContainer
+import com.example.lint.checks.MethodKey
+import com.example.lint.checks.MethodNode
+import com.example.lint.checks.Node
+import com.example.lint.checks.RootNode
+import com.example.lint.checks.ThrowNode
+import com.example.lint.checks.TryCatchSubstitution
+import com.example.lint.checks.indent
+import com.example.lint.checks.methodKey
+import com.example.lint.checks.printTree
+import com.example.lint.checks.safeExceptions
+import com.example.lint.checks.throwExceptions
 import org.jetbrains.kotlin.utils.addToStdlib.popLast
 import org.jetbrains.uast.UCallExpression
 import org.jetbrains.uast.UClass
@@ -24,7 +38,7 @@ class StackResolution(val context: JavaContext) {
     /**
      * 存储访问过的所有method
      */
-    private val methodCache = mutableMapOf<MethodKey, MethodNode>()
+    private val resolvedMethodCache = mutableMapOf<MethodKey, MethodNode>()
 
     @Suppress("UnstableApiUsage")
     private val visitor = object : AbstractUastVisitor() {
@@ -46,14 +60,14 @@ class StackResolution(val context: JavaContext) {
                     }
                 }"
             )
-            val cache = methodCache[key]
+            val cache = resolvedMethodCache[key]
             val methodNode = cache ?: MethodNode(
                 node.name,
                 key,
                 throws
             )
             if (cache == null) {
-                methodCache[key] = methodNode
+                resolvedMethodCache[key] = methodNode
             }
             (last as MethodContainer).methods.add(methodNode)
 
@@ -82,14 +96,12 @@ class StackResolution(val context: JavaContext) {
             context.client.log(
                 Severity.IGNORE,
                 null,
-                "${stackIndent()}outMethod ${node.name}\n"
+                "${stackIndent()}outMethod ${node.name}"
             )
             val throws = current.throwList()
             if (throws.isEmpty()) {
                 val pre = callStack.last
-                if (pre is MethodContainer) {
-                    pre.methods.remove(current)
-                }
+                (pre as MethodContainer).methods.remove(current)
             } else {
                 current.replace(throws)
                 if (callStack.size == 2) {
@@ -114,14 +126,13 @@ class StackResolution(val context: JavaContext) {
                 if (uElement != null) {
                     if (uElement is UMethod) {
                         val key = uElement.methodKey()
-                        val methodNode = methodCache[key]
+                        val methodNode = resolvedMethodCache[key]
                         if (methodNode != null) {
-                            if (current is MethodNode) {
-                                current.methods.add(methodNode)
-                            }
+                            (current as MethodNode).methods.add(methodNode)
                         } else {
                             uElement.accept(this)
                         }
+
                     }
                 }
             }
@@ -142,8 +153,8 @@ class StackResolution(val context: JavaContext) {
         }
 
         override fun afterVisitThrowExpression(node: UThrowExpression) {
-            context.client.log(Severity.IGNORE, null, "${stackIndent()}outThrow")
             callStack.popLast()
+            context.client.log(Severity.IGNORE, null, "${stackIndent()}outThrow")
             super.afterVisitThrowExpression(node)
         }
 
@@ -154,8 +165,7 @@ class StackResolution(val context: JavaContext) {
                 null,
                 "${stackIndent()}visitTry $node $exceptions"
             )
-            val tryCatchSubstitution =
-                TryCatchSubstitution(exceptions)
+            val tryCatchSubstitution = TryCatchSubstitution(exceptions)
             val current = callStack.last
             (current as MethodNode).tryBlock.add(tryCatchSubstitution)
             callStack.addLast(tryCatchSubstitution)
@@ -166,14 +176,9 @@ class StackResolution(val context: JavaContext) {
         override fun afterVisitTryExpression(node: UTryExpression) {
             val current = callStack.popLast() as TryCatchSubstitution
             context.client.log(Severity.IGNORE, null, "${stackIndent()}outTry $node")
-            val throws = current.methods.flatMap {
-                it.throws
-            }.toSet() - current.caught.toSet()
+            val throws = current.throwList()
             if (throws.isEmpty()) {
-                val pre = callStack.last
-                if (pre is MethodNode) {
-                    pre.tryBlock.remove(current)
-                }
+                (callStack.last as MethodNode).tryBlock.remove(current)
             }
             super.afterVisitTryExpression(node)
         }

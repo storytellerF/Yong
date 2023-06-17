@@ -96,7 +96,7 @@ class ThrowNode(override val methods: MutableList<MethodNode> = mutableListOf())
 }
 
 class TryCatchSubstitution(
-    val caught: MutableList<String>,
+    private val caught: MutableList<String>,
     override val methods: MutableList<MethodNode> = mutableListOf(),
 ) : Node(), MethodContainer {
     override fun debug(): String {
@@ -129,6 +129,11 @@ internal fun printTree(node: Node, context: JavaContext, step: Int) {
         "${indent(step)}${node.debugTree()}"
     )
     val nextStep = step + 1
+    if (node is MethodContainer) {
+        node.methods.forEach {
+            printTree(it, context, nextStep)
+        }
+    }
     when (node) {
         is RootNode -> {
             node.activities.forEach {
@@ -136,23 +141,11 @@ internal fun printTree(node: Node, context: JavaContext, step: Int) {
             }
         }
 
-        is ActivityNode -> {
-            node.methods.forEach {
-                printTree(it, context, nextStep)
-            }
-        }
-
         is MethodNode -> {
-            node.methods.forEach {
-                printTree(it, context, nextStep)
-            }
             node.tryBlock.forEach {
                 printTree(it, context, nextStep)
             }
-        }
-
-        is TryCatchSubstitution -> {
-            node.methods.forEach {
+            node.throwNodes.forEach {
                 printTree(it, context, nextStep)
             }
         }

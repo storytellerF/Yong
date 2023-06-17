@@ -24,6 +24,7 @@ import com.android.tools.lint.detector.api.Issue
 import com.android.tools.lint.detector.api.JavaContext
 import com.android.tools.lint.detector.api.Scope
 import com.android.tools.lint.detector.api.Severity
+import com.example.lint.checks.resolution.StackResolution
 import org.jetbrains.uast.UClass
 import org.jetbrains.uast.UElement
 
