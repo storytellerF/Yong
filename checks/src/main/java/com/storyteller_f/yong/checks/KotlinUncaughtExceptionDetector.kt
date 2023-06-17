@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.example.lint.checks
+package com.storyteller_f.yong.checks
 
 import com.android.tools.lint.client.api.UElementHandler
 import com.android.tools.lint.detector.api.Category
@@ -24,7 +24,7 @@ import com.android.tools.lint.detector.api.Issue
 import com.android.tools.lint.detector.api.JavaContext
 import com.android.tools.lint.detector.api.Scope
 import com.android.tools.lint.detector.api.Severity
-import com.example.lint.checks.resolution.StackResolution
+import com.storyteller_f.yong.checks.resolution.StackResolution
 import org.jetbrains.uast.UClass
 import org.jetbrains.uast.UElement
 

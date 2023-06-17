@@ -10,7 +10,7 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
-    namespace 'com.example.lint.library'
+    namespace 'com.storyteller_f.yong.library'
     lint {
         checkDependencies true
     }

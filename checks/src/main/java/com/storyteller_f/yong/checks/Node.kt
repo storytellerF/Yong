@@ -1,4 +1,4 @@
-package com.example.lint.checks
+package com.storyteller_f.yong.checks
 
 import com.android.tools.lint.detector.api.JavaContext
 import com.android.tools.lint.detector.api.Severity
@@ -78,7 +78,8 @@ class MethodNode(
  * 临时节点，用于判断当前visitMethod 是不是需要throw
  * 虽然是methodNode，但是执行的是初始化操作。
  */
-class ThrowNode(override val methods: MutableList<MethodNode> = mutableListOf()): Node(), MethodContainer {
+class ThrowNode(override val methods: MutableList<MethodNode> = mutableListOf()): Node(),
+    MethodContainer {
     override fun debug(): String {
         return "Throw()"
     }

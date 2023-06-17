@@ -1,4 +1,4 @@
-package com.example.lint.checks
+package com.storyteller_f.yong.checks
 
 import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiClassType

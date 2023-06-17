@@ -1,4 +1,4 @@
-package com.example.lint.checks
+package com.storyteller_f.yong.checks
 
 import com.intellij.psi.PsiClassType
 import org.jetbrains.uast.UMethod

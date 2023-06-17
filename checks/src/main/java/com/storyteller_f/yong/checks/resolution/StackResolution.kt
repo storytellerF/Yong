@@ -1,22 +1,22 @@
-package com.example.lint.checks.resolution
+package com.storyteller_f.yong.checks.resolution
 
 import com.android.tools.lint.detector.api.JavaContext
 import com.android.tools.lint.detector.api.Severity
-import com.example.lint.checks.ActivityNode
-import com.example.lint.checks.KotlinUncaughtExceptionDetector
-import com.example.lint.checks.MethodContainer
-import com.example.lint.checks.MethodKey
-import com.example.lint.checks.MethodNode
-import com.example.lint.checks.Node
-import com.example.lint.checks.RootNode
-import com.example.lint.checks.ThrowNode
-import com.example.lint.checks.ThrowableDefinition
-import com.example.lint.checks.TryCatchSubstitution
-import com.example.lint.checks.indent
-import com.example.lint.checks.methodKey
-import com.example.lint.checks.printTree
-import com.example.lint.checks.safeExceptions
-import com.example.lint.checks.throwExceptions
+import com.storyteller_f.yong.checks.ActivityNode
+import com.storyteller_f.yong.checks.KotlinUncaughtExceptionDetector
+import com.storyteller_f.yong.checks.MethodContainer
+import com.storyteller_f.yong.checks.MethodKey
+import com.storyteller_f.yong.checks.MethodNode
+import com.storyteller_f.yong.checks.Node
+import com.storyteller_f.yong.checks.RootNode
+import com.storyteller_f.yong.checks.ThrowNode
+import com.storyteller_f.yong.checks.ThrowableDefinition
+import com.storyteller_f.yong.checks.TryCatchSubstitution
+import com.storyteller_f.yong.checks.indent
+import com.storyteller_f.yong.checks.methodKey
+import com.storyteller_f.yong.checks.printTree
+import com.storyteller_f.yong.checks.safeExceptions
+import com.storyteller_f.yong.checks.throwExceptions
 import org.jetbrains.kotlin.utils.addToStdlib.popLast
 import org.jetbrains.uast.UCallExpression
 import org.jetbrains.uast.UClass
@@ -68,7 +68,7 @@ class StackResolution(val context: JavaContext) {
             val throws = keywordExceptions + constructorExceptions
             context.client.log(
                 Severity.IGNORE, null,
-                "${stackIndent()}visitMethod ${node.name} throws count: ${throws.size} expressions count: ${(node.uastBody as? KotlinUBlockExpression)?.expressions?.size} ${
+                "${stackIndent()}visitMethod ${node.name} throws count: ${throws.size} expressions count: ${(node.uastBody as? KotlinUBlockExpression)?.expressions?.size ?: 0} ${
                     callStack.joinToString {
                         it.debug()
                     }
@@ -105,8 +105,9 @@ class StackResolution(val context: JavaContext) {
                 null,
                 "${stackIndent()}outMethod ${node.name} ${throws.size}"
             )
-
-
+            if ((callStack.last as? MethodContainer)?.methods?.isNotEmpty() == true) {
+                context.client.log(Severity.IGNORE, null, "")
+            }
             if (throws.isEmpty()) {
                 val pre = callStack.last
                 (pre as MethodContainer).methods.remove(current)
