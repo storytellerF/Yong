@@ -19,33 +19,58 @@ interface MethodContainer {
     val methods: MutableList<MethodNode>
 }
 
+interface Throwable {
+    fun throwList(): Set<ThrowableDefinition>
+}
+
 interface Debug {
     fun debug(): String
 
     fun debugTree(): String = debug()
 }
 
-class RootNode(val activities: MutableList<ActivityNode> = mutableListOf(), val entranceNodes: MutableList<EntranceNode> = mutableListOf()) : Node() {
+class RootNode(val contextNodes: MutableList<ContextNode> = mutableListOf(), val entranceNodes: MutableList<EntranceNode> = mutableListOf()) : Node() {
     override fun debug(): String {
         return "Root"
     }
 
-}
-
-class EntranceNode(override val methods: MutableList<MethodNode>, override val name: String): Node(), Named, MethodContainer {
-    override fun debug(): String {
-        return "Entrance($name)"
+    fun isEmpty(): Boolean {
+        return contextNodes.isEmpty() && entranceNodes.isEmpty()
     }
 
 }
 
-class ActivityNode(
+class EntranceNode(override val methods: MutableList<MethodNode>, override val name: String): Node(), Named, MethodContainer, Throwable {
+    override fun debug(): String {
+        return "Entrance($name)"
+    }
+
+    override fun throwList(): Set<ThrowableDefinition> {
+        return methods.flatMap {
+            it.throwList()
+        }.toSet()
+    }
+
+}
+
+class ContextNode(
     override val methods: MutableList<MethodNode>,
     override val name: String
 ) :
-    Node(), Named, MethodContainer {
+    Node(), Named, MethodContainer, Throwable {
     override fun debug(): String {
-        return "Activity($name)"
+        val label = when {
+            name.endsWith("Activity") -> "Activity"
+            name.endsWith("Fragment") -> "Fragment"
+            else -> "Context"
+        }
+        return "$label($name)"
+    }
+
+    override fun throwList(): Set<ThrowableDefinition> {
+        return methods.flatMap {
+            it.throwList()
+        }.toSet()
     }
 }
 
@@ -56,7 +81,7 @@ class MethodNode(
     val throwNodes: MutableList<ThrowNode> = mutableListOf(),
     val tryBlock: MutableList<TryCatchSubstitution> = mutableListOf(),
     override val methods: MutableList<MethodNode> = mutableListOf(),
-) : Node(), Named, MethodContainer {
+) : Node(), Named, MethodContainer, Throwable{
     override fun debug(): String {
         return "Method($name)"
     }
@@ -67,7 +92,7 @@ class MethodNode(
         }
     }
 
-    internal fun throwList(): Set<ThrowableDefinition> {
+    override fun throwList(): Set<ThrowableDefinition> {
         val nodeThrows = throwNodes.flatMap {
             it.throwList()
         }.toSet()
@@ -86,22 +111,22 @@ class MethodNode(
  * 虽然是methodNode，但是执行的是初始化操作。
  */
 class ThrowNode(override val methods: MutableList<MethodNode> = mutableListOf()): Node(),
-    MethodContainer {
+    MethodContainer, Throwable {
     override fun debug(): String {
         return "Throw()"
     }
 
-    fun throwList(): List<ThrowableDefinition> {
+    override fun throwList(): Set<ThrowableDefinition> {
         return methods.flatMap { node ->
             node.throwList()
-        }
+        }.toSet()
     }
 }
 
 class TryCatchSubstitution(
     private val caught: MutableList<ThrowableDefinition>,
     override val methods: MutableList<MethodNode> = mutableListOf(),
-) : Node(), MethodContainer {
+) : Node(), MethodContainer, Throwable {
     override fun debug(): String {
         return "Caught(${
             caught.joinToString {
@@ -120,7 +145,7 @@ class TryCatchSubstitution(
         }})"
     }
 
-    fun throwList(): Set<ThrowableDefinition> {
+    override fun throwList(): Set<ThrowableDefinition> {
         val throws = methods.flatMap { methodNode ->
             methodNode.throwList()
         }.toSet()
@@ -151,7 +176,7 @@ internal fun printTree(node: Node, context: JavaContext, step: Int) {
     }
     when (node) {
         is RootNode -> {
-            node.activities.forEach {
+            node.contextNodes.forEach {
                 printTree(it, context, nextStep)
             }
             node.entranceNodes.forEach {

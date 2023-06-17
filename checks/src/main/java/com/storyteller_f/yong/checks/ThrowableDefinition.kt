@@ -2,7 +2,6 @@ package com.storyteller_f.yong.checks
 
 import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiClassType
-import com.intellij.psi.PsiType
 
 class ThrowableDefinition(val name: String, val children: MutableList<ThrowableDefinition> = mutableListOf()) {
 

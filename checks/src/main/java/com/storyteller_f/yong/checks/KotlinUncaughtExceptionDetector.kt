@@ -44,13 +44,11 @@ class KotlinUncaughtExceptionDetector : Detector(), UastScanner {
         return object : UElementHandler() {
 
             override fun visitClass(node: UClass) {
-                val isActivity = node.supers.any {
-                    it.qualifiedName == "androidx.appcompat.app.AppCompatActivity"
-                }
+                val isLogicalContext = node.isLogicalContext()
                 val hasMainMethod = node.methods.any {
                     it.isMainMethod()
                 }
-                if (isActivity) {
+                if (isLogicalContext) {
                     resolution.start(node)
                 } else if (hasMainMethod) {
                     resolution.start(node)

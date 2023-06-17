@@ -3,6 +3,7 @@ package com.storyteller_f.yong.checks
 import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiClassType
 import com.intellij.psi.PsiType
+import org.jetbrains.uast.UClass
 import org.jetbrains.uast.UMethod
 import org.jetbrains.uast.UTryExpression
 
@@ -34,4 +35,17 @@ internal fun PsiClass.supers(): MutableList<String> {
         su = superClass
     }
     return list
+}
+
+internal fun UClass.isLogicalContext(): Boolean {
+    val supers = supers()
+    val list = listOf(
+        "android.content.Context",
+        "androidx.fragment.app.Fragment",
+        "android.content.BroadcastReceiver",
+        "android.content.ContentProvider"
+    )
+    return supers.any {
+        list.contains(it)
+    }
 }

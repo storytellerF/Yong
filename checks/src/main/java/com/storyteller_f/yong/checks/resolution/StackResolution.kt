@@ -2,7 +2,7 @@ package com.storyteller_f.yong.checks.resolution
 
 import com.android.tools.lint.detector.api.JavaContext
 import com.android.tools.lint.detector.api.Severity
-import com.storyteller_f.yong.checks.ActivityNode
+import com.storyteller_f.yong.checks.ContextNode
 import com.storyteller_f.yong.checks.EntranceNode
 import com.storyteller_f.yong.checks.KotlinUncaughtExceptionDetector
 import com.storyteller_f.yong.checks.MethodContainer
@@ -11,9 +11,11 @@ import com.storyteller_f.yong.checks.MethodNode
 import com.storyteller_f.yong.checks.Node
 import com.storyteller_f.yong.checks.RootNode
 import com.storyteller_f.yong.checks.ThrowNode
+import com.storyteller_f.yong.checks.Throwable
 import com.storyteller_f.yong.checks.ThrowableDefinition
 import com.storyteller_f.yong.checks.TryCatchSubstitution
 import com.storyteller_f.yong.checks.indent
+import com.storyteller_f.yong.checks.isLogicalContext
 import com.storyteller_f.yong.checks.isMainMethod
 import com.storyteller_f.yong.checks.methodKey
 import com.storyteller_f.yong.checks.printTree
@@ -84,9 +86,9 @@ class StackResolution(val context: JavaContext) {
             if (cache == null) {
                 resolvedMethodCache[key] = methodNode
             }
-            if (last is ActivityNode && node.findSuperMethods().isNotEmpty() ||
+            if (last is ContextNode && node.findSuperMethods().isNotEmpty() ||
                 last is EntranceNode && node.isMainMethod() ||
-                last !is ActivityNode && last !is EntranceNode
+                last !is ContextNode && last !is EntranceNode
             )
                 (last as MethodContainer).methods.add(methodNode)
 
@@ -116,10 +118,12 @@ class StackResolution(val context: JavaContext) {
             }
             when {
                 throws.isEmpty() -> (pre as MethodContainer).methods.remove(current)
-                pre is ActivityNode || pre is EntranceNode -> {
+                pre is ContextNode || pre is EntranceNode -> {
                     context.report(
                         KotlinUncaughtExceptionDetector.ISSUE, node, context.getLocation(node),
-                        "uncaught exception ${throws.joinToString()}"
+                        "uncaught exception ${
+                            throws.joinToString { it.name }
+                        }"
                     )
                 }
             }
@@ -201,14 +205,11 @@ class StackResolution(val context: JavaContext) {
 
         override fun visitClass(node: UClass): Boolean {
             context.client.log(Severity.IGNORE, null, "visitClass ${node.qualifiedName}")
-            val isActivity = node.supers.any {
-                it.qualifiedName == "androidx.appcompat.app.AppCompatActivity"
-            }
             val name = node.name!!
-            if (isActivity) {
-                val activityNode = ActivityNode(mutableListOf(), name)
-                root.activities.add(activityNode)
-                callStack.addLast(activityNode)
+            if (node.isLogicalContext()) {
+                val contextNode = ContextNode(mutableListOf(), name)
+                root.contextNodes.add(contextNode)
+                callStack.addLast(contextNode)
             } else {
                 val entranceNode = EntranceNode(mutableListOf(), name)
                 root.entranceNodes.add(entranceNode)
@@ -219,10 +220,27 @@ class StackResolution(val context: JavaContext) {
 
         override fun afterVisitClass(node: UClass) {
             super.afterVisitClass(node)
-            context.client.log(Severity.IGNORE, null, "outClass ${node.qualifiedName}")
-            callStack.removeLast()
-            printTree(root, context, 0)
-            printTree(ThrowableDefinition.rootDefinition, context, 0)
+            val last = callStack.removeLast() as Throwable
+            val throws = last.throwList()
+            context.client.log(Severity.IGNORE, null, "outClass ${node.qualifiedName} ${throws.size}")
+            if (throws.isEmpty()) {
+                if (last is ContextNode) {
+                    root.contextNodes.remove(last)
+                } else if (last is EntranceNode) {
+                    root.entranceNodes.remove(last)
+                }
+            }
+            val filter = callStack.filter {
+                it is ContextNode || it is EntranceNode
+            }
+            if (filter.isEmpty()) {
+                if (!root.isEmpty()){
+                    printTree(root, context, 0)
+                    if (ThrowableDefinition.rootDefinition.children.isNotEmpty())
+                        printTree(ThrowableDefinition.rootDefinition, context, 0)
+                }
+            }
+
         }
 
     }
