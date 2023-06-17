@@ -1,5 +1,6 @@
 package com.storyteller_f.yong.checks
 
+import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiClassType
 import com.intellij.psi.PsiType
 import org.jetbrains.uast.UMethod
@@ -23,3 +24,14 @@ internal fun UMethod.methodKey() = MethodKey(this)
 
 internal fun UMethod.isMainMethod() =
     name == "main" && isStatic && returnType == PsiType.VOID
+
+internal fun PsiClass.supers(): MutableList<String> {
+    val list = mutableListOf<String>()
+    var su: PsiType = superTypes.first()
+    while (true) {
+        list.add(su.canonicalText)
+        val superClass = su.superTypes.firstOrNull() ?: break
+        su = superClass
+    }
+    return list
+}

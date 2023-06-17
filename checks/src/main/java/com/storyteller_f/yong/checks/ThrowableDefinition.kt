@@ -42,54 +42,36 @@ class ThrowableDefinition(val name: String, val children: MutableList<ThrowableD
                 val cache = p.children.find {
                     it.name == clazz
                 }
-                if (cache == null) {
+                if (cache != null) cache
+                else {
                     val new = ThrowableDefinition(clazz)
                     resolvedDefinition[clazz] = new
                     p.addChild(new)
                     new
-                } else cache
+                }
             }
             parent.addChild(node)
             resolvedDefinition[node.name] = node
         }
 
-        fun throwableDefinition(psiClassType: PsiClassType) = throwableDefinition(psiClassType.resolve()!!) { it ->
-            val list = mutableListOf<String>()
-            var su: PsiType = it.superTypes.first()
-            while (true) {
-                list.add(su.canonicalText)
-                val superClass = su.superTypes.firstOrNull() ?: break
-                su = superClass
-            }
-            list.subList(0, list.size - 2)
+        fun throwableDefinition(psiClassType: PsiClassType) = throwableDefinition(psiClassType.resolve()!!) {
+            it.supers().subList(0, it.supers().size - 2)
         }
 
         fun throwableDefinition(psiClass: PsiClass) = throwableDefinition(psiClass) {
-            val list = mutableListOf<String>()
-            val directSuperClass = psiClass.containingClass?.superClass
-            if (directSuperClass != null) {
-                var su: PsiClass = directSuperClass
-                while (true) {
-                    list.add(su.qualifiedName!!)
-                    val superClass = su.superClass ?: break
-                    su = superClass
-                }
-                list.subList(0, list.size - 2)
-            } else {
-                emptyList()
-            }
-
+            it.supers().subList(0, it.supers().size - 2)
         }
 
         private fun throwableDefinition(psiClass: PsiClass, supers: (PsiClass) -> List<String>): ThrowableDefinition {
             val unrecognized = psiClass.qualifiedName!!
             val recognized = resolvedDefinition[unrecognized]
-            return if (recognized == null) {
+            return if (recognized != null) recognized
+            else {
                 val node = ThrowableDefinition(unrecognized)
                 val parents = supers(psiClass)
                 addChild(node, parents)
                 node
-            } else recognized
+            }
         }
 
     }
