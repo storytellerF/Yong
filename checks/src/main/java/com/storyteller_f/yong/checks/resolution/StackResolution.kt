@@ -1,7 +1,6 @@
 package com.storyteller_f.yong.checks.resolution
 
 import com.android.tools.lint.detector.api.JavaContext
-import com.android.tools.lint.detector.api.Severity
 import com.storyteller_f.yong.checks.ContextNode
 import com.storyteller_f.yong.checks.EntranceNode
 import com.storyteller_f.yong.checks.KotlinUncaughtExceptionDetector
@@ -69,8 +68,7 @@ class StackResolution(val context: JavaContext) {
              * 通过注解或者关键字指定的异常
              */
             val throws = keywordExceptions + constructorExceptions
-            context.client.log(
-                Severity.IGNORE, null,
+            log(
                 "${stackIndent()}visitMethod ${node.name} throws count: ${throws.size} expressions count: ${(node.uastBody as? KotlinUBlockExpression)?.expressions?.size ?: 0} ${
                     callStack.joinToString {
                         it.debug()
@@ -107,14 +105,12 @@ class StackResolution(val context: JavaContext) {
             super.afterVisitMethod(node)
             val current = callStack.popLast() as MethodNode
             val throws = current.throwList()
-            context.client.log(
-                Severity.IGNORE,
-                null,
+            log(
                 "${stackIndent()}outMethod ${node.name} ${throws.size}"
             )
             val pre = callStack.last
             if (((pre as? MethodContainer)?.methods?.size ?: 0) > 1) {
-                context.client.log(Severity.IGNORE, null, "")
+                log("")
             }
             when {
                 throws.isEmpty() -> (pre as MethodContainer).methods.remove(current)
@@ -131,9 +127,7 @@ class StackResolution(val context: JavaContext) {
         }
 
         override fun visitCallExpression(node: UCallExpression): Boolean {
-            context.client.log(
-                Severity.IGNORE,
-                null,
+            log(
                 "${stackIndent()}call ${node.methodName} $node"
             )
             val current = callStack.last
@@ -156,9 +150,7 @@ class StackResolution(val context: JavaContext) {
         }
 
         override fun visitThrowExpression(node: UThrowExpression): Boolean {
-            context.client.log(
-                Severity.IGNORE,
-                null,
+            log(
                 "${stackIndent()}visitThrow ${node.thrownExpression}"
             )
             val current = callStack.last
@@ -170,9 +162,7 @@ class StackResolution(val context: JavaContext) {
 
         override fun afterVisitThrowExpression(node: UThrowExpression) {
             val current = callStack.popLast() as ThrowNode
-            context.client.log(
-                Severity.IGNORE,
-                null,
+            log(
                 "${stackIndent()}outThrow ${current.throwList()}"
             )
             super.afterVisitThrowExpression(node)
@@ -180,9 +170,7 @@ class StackResolution(val context: JavaContext) {
 
         override fun visitTryExpression(node: UTryExpression): Boolean {
             val exceptions = node.safeExceptions().toMutableList()
-            context.client.log(
-                Severity.IGNORE,
-                null,
+            log(
                 "${stackIndent()}visitTry $node ${exceptions.joinToString { it.name }}"
             )
             val tryCatchSubstitution = TryCatchSubstitution(exceptions)
@@ -195,7 +183,7 @@ class StackResolution(val context: JavaContext) {
 
         override fun afterVisitTryExpression(node: UTryExpression) {
             val current = callStack.popLast() as TryCatchSubstitution
-            context.client.log(Severity.IGNORE, null, "${stackIndent()}outTry $node")
+            log("${stackIndent()}outTry $node")
             val throws = current.throwList()
             if (throws.isEmpty()) {
                 (callStack.last as MethodNode).tryBlock.remove(current)
@@ -204,7 +192,7 @@ class StackResolution(val context: JavaContext) {
         }
 
         override fun visitClass(node: UClass): Boolean {
-            context.client.log(Severity.IGNORE, null, "visitClass ${node.qualifiedName}")
+            log("visitClass ${node.qualifiedName}")
             val name = node.name!!
             if (node.isLogicalContext()) {
                 val contextNode = ContextNode(mutableListOf(), name)
@@ -222,7 +210,7 @@ class StackResolution(val context: JavaContext) {
             super.afterVisitClass(node)
             val last = callStack.removeLast() as Throwable
             val throws = last.throwList()
-            context.client.log(Severity.IGNORE, null, "outClass ${node.qualifiedName} ${throws.size}")
+            log("outClass ${node.qualifiedName} ${throws.size}")
             if (throws.isEmpty()) {
                 if (last is ContextNode) {
                     root.contextNodes.remove(last)
@@ -230,19 +218,19 @@ class StackResolution(val context: JavaContext) {
                     root.entranceNodes.remove(last)
                 }
             }
-            val filter = callStack.filter {
+            val loops = callStack.filter {
                 it is ContextNode || it is EntranceNode
             }
-            if (filter.isEmpty()) {
-                if (!root.isEmpty()){
-                    printTree(root, context, 0)
-                    if (ThrowableDefinition.rootDefinition.children.isNotEmpty())
-                        printTree(ThrowableDefinition.rootDefinition, context, 0)
-                }
+            if (loops.isEmpty() && !root.isEmpty()) {
+                printTree(root, context, 0)
             }
 
         }
 
+    }
+
+    private fun log(format: String) {
+//        context.client.log(Severity.IGNORE, null, format)
     }
 
     fun start(node: UClass) {

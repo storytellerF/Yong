@@ -1,5 +1,7 @@
 package com.storyteller_f.yong.checks
 
+import com.android.tools.lint.detector.api.JavaContext
+import com.android.tools.lint.detector.api.Severity
 import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiClassType
 
@@ -72,6 +74,25 @@ class ThrowableDefinition(val name: String, val children: MutableList<ThrowableD
                 node
             }
         }
+
+        internal fun printTree(node: ThrowableDefinition, context: JavaContext, step: Int) {
+            context.client.log(
+                Severity.INFORMATIONAL,
+                null,
+                "${indent(step)}${node.name}"
+            )
+            val nextStep = step + 1
+            node.children.forEach {
+                printTree(it, context, nextStep)
+            }
+        }
+
+        fun printTree(context: JavaContext) {
+            if (rootDefinition.children.isNotEmpty())
+                printTree(rootDefinition, context, 0)
+        }
+
+
 
     }
 }

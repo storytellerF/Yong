@@ -200,15 +200,3 @@ internal fun indent(step: Int): String {
         "\t"
     }.joinToString("")
 }
-
-internal fun printTree(node: ThrowableDefinition, context: JavaContext, step: Int) {
-    context.client.log(
-        Severity.INFORMATIONAL,
-        null,
-        "${indent(step)}${node.name}"
-    )
-    val nextStep = step + 1
-    node.children.forEach {
-        printTree(it, context, nextStep)
-    }
-}
