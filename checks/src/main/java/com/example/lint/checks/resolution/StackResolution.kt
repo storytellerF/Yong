@@ -10,6 +10,7 @@ import com.example.lint.checks.MethodNode
 import com.example.lint.checks.Node
 import com.example.lint.checks.RootNode
 import com.example.lint.checks.ThrowNode
+import com.example.lint.checks.ThrowableDefinition
 import com.example.lint.checks.TryCatchSubstitution
 import com.example.lint.checks.indent
 import com.example.lint.checks.methodKey
@@ -25,7 +26,6 @@ import org.jetbrains.uast.UTryExpression
 import org.jetbrains.uast.kotlin.KotlinUBlockExpression
 import org.jetbrains.uast.kotlin.KotlinUFunctionCallExpression
 import org.jetbrains.uast.resolveToUElement
-import org.jetbrains.uast.util.isConstructorCall
 import org.jetbrains.uast.visitor.AbstractUastVisitor
 import java.util.Collections
 import java.util.LinkedList
@@ -51,7 +51,21 @@ class StackResolution(val context: JavaContext) {
             }
             val last = callStack.last
             if (last is ActivityNode && node.findSuperMethods().isEmpty()) return true
-            val throws = node.throwExceptions().toMutableList()
+            /*
+             * 判断是否是调用了Exception 构造函数
+             */
+            val constructorExceptions = if (last is ThrowNode) {
+                listOf(
+                    ThrowableDefinition.throwableDefinition(node.containingClass!!)
+                )
+            } else emptyList()
+
+            val keywordExceptions = node.throwExceptions()
+
+            /**
+             * 通过注解或者关键字指定的异常
+             */
+            val throws = keywordExceptions + constructorExceptions
             context.client.log(
                 Severity.IGNORE, null,
                 "${stackIndent()}visitMethod ${node.name} throws count: ${throws.size} expressions count: ${(node.uastBody as? KotlinUBlockExpression)?.expressions?.size} ${
@@ -64,7 +78,7 @@ class StackResolution(val context: JavaContext) {
             val methodNode = cache ?: MethodNode(
                 node.name,
                 key,
-                throws
+                throws.toMutableList()
             )
             if (cache == null) {
                 resolvedMethodCache[key] = methodNode
@@ -85,25 +99,18 @@ class StackResolution(val context: JavaContext) {
         override fun afterVisitMethod(node: UMethod) {
             super.afterVisitMethod(node)
             val current = callStack.popLast() as MethodNode
-            if (node.isConstructorCall()) {
-                val pre = callStack.last
-                if (pre is ThrowNode) {
-                    assert(node.isConstructorCall())
-                    val qualifiedName = node.containingClass?.qualifiedName!!
-                    current.throws.add(qualifiedName)
-                }
-            }
+            val throws = current.throwList()
             context.client.log(
                 Severity.IGNORE,
                 null,
-                "${stackIndent()}outMethod ${node.name}"
+                "${stackIndent()}outMethod ${node.name} ${throws.size}"
             )
-            val throws = current.throwList()
+
+
             if (throws.isEmpty()) {
                 val pre = callStack.last
                 (pre as MethodContainer).methods.remove(current)
             } else {
-                current.replace(throws)
                 if (callStack.size == 2) {
                     context.report(
                         KotlinUncaughtExceptionDetector.ISSUE, node, context.getLocation(node),
@@ -163,7 +170,7 @@ class StackResolution(val context: JavaContext) {
             context.client.log(
                 Severity.IGNORE,
                 null,
-                "${stackIndent()}visitTry $node $exceptions"
+                "${stackIndent()}visitTry $node ${exceptions.joinToString { it.name }}"
             )
             val tryCatchSubstitution = TryCatchSubstitution(exceptions)
             val current = callStack.last
@@ -195,6 +202,7 @@ class StackResolution(val context: JavaContext) {
             super.afterVisitClass(node)
             callStack.removeLast()
             printTree(root, context, 0)
+            printTree(ThrowableDefinition.rootDefinition, context, 0)
         }
 
     }

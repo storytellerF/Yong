@@ -84,3 +84,4 @@ class KotlinUncaughtExceptionDetector : Detector(), UastScanner {
         )
     }
 }
+

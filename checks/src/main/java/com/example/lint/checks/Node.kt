@@ -45,7 +45,7 @@ class ActivityNode(
 class MethodNode(
     override val name: String,
     val key: MethodKey,
-    val throws: MutableList<String> = mutableListOf(),
+    private val declareThrows: MutableList<ThrowableDefinition> = mutableListOf(),
     val throwNodes: MutableList<ThrowNode> = mutableListOf(),
     val tryBlock: MutableList<TryCatchSubstitution> = mutableListOf(),
     override val methods: MutableList<MethodNode> = mutableListOf(),
@@ -55,27 +55,22 @@ class MethodNode(
     }
 
     override fun debugTree(): String {
-        return debug() + " " + throws.joinToString()
+        return debug() + " " + declareThrows.joinToString {
+            it.name
+        }
     }
 
-    internal fun replace(
-        throws: Set<String>
-    ) {
-        this.throws.clear()
-        this.throws.addAll(throws.toMutableList())
-    }
-
-    internal fun throwList(): Set<String> {
+    internal fun throwList(): Set<ThrowableDefinition> {
         val nodeThrows = throwNodes.flatMap {
             it.throwList()
         }.toSet()
-        val methodThrows = methods.flatMap {
-            it.throws
+        val childMethodThrows = methods.flatMap {
+            it.throwList()
         }.toSet()
         val tryLeak = tryBlock.flatMap {
             it.throwList()
         }.toSet()
-        return throws.toSet() + nodeThrows + methodThrows + tryLeak
+        return declareThrows.toSet() + nodeThrows + childMethodThrows + tryLeak
     }
 }
 
@@ -88,7 +83,7 @@ class ThrowNode(override val methods: MutableList<MethodNode> = mutableListOf())
         return "Throw()"
     }
 
-    fun throwList(): List<String> {
+    fun throwList(): List<ThrowableDefinition> {
         return methods.flatMap { node ->
             node.throwList()
         }
@@ -96,11 +91,15 @@ class ThrowNode(override val methods: MutableList<MethodNode> = mutableListOf())
 }
 
 class TryCatchSubstitution(
-    private val caught: MutableList<String>,
+    private val caught: MutableList<ThrowableDefinition>,
     override val methods: MutableList<MethodNode> = mutableListOf(),
 ) : Node(), MethodContainer {
     override fun debug(): String {
-        return "try(${caught.joinToString()}{${
+        return "Caught(${
+            caught.joinToString {
+                it.name
+            }
+        }{${
             methods.joinToString {
                 it.debug()
             }
@@ -108,13 +107,21 @@ class TryCatchSubstitution(
     }
 
     override fun debugTree(): String {
-        return "try(${caught.joinToString()})"
+        return "Caught(${caught.joinToString {
+            it.name
+        }})"
     }
 
-    fun throwList(): Set<String> {
-        return methods.flatMap { methodNode ->
-            methodNode.throws
-        }.toSet() - caught.toSet()
+    fun throwList(): Set<ThrowableDefinition> {
+        val throws = methods.flatMap { methodNode ->
+            methodNode.throwList()
+        }.toSet()
+        val caught = caught.toSet()
+        return throws.filter {
+            !caught.any { parent ->
+                parent.name == it.name || parent.hasChild(it)
+            }
+        }.toSet()
     }
 }
 
@@ -156,4 +163,16 @@ internal fun indent(step: Int): String {
     return List(step) {
         "\t"
     }.joinToString("")
+}
+
+internal fun printTree(node: ThrowableDefinition, context: JavaContext, step: Int) {
+    context.client.log(
+        Severity.INFORMATIONAL,
+        null,
+        "${indent(step)}${node.name}"
+    )
+    val nextStep = step + 1
+    node.children.forEach {
+        printTree(it, context, nextStep)
+    }
 }

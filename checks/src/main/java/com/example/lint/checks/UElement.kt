@@ -1,23 +1,21 @@
 package com.example.lint.checks
 
+import com.intellij.psi.PsiClassType
 import org.jetbrains.uast.UMethod
 import org.jetbrains.uast.UTryExpression
 
-fun UTryExpression.safeExceptions(): List<String> {
-    val exceptions =
-        catchClauses.flatMap { clause ->
-            clause.types.map {
-                it.canonicalText
-            }
+fun UTryExpression.safeExceptions(): List<ThrowableDefinition> {
+    return catchClauses.flatMap { clause ->
+        clause.types.map {
+            ThrowableDefinition.throwableDefinition(it as PsiClassType)
         }
-    return exceptions
+    }
 }
 
-fun UMethod.throwExceptions(): List<String> {
-    val throws = throwsList.referencedTypes.map {
-        it.canonicalText
+fun UMethod.throwExceptions(): List<ThrowableDefinition> {
+    return throwsList.referencedTypes.map {
+        ThrowableDefinition.throwableDefinition(it)
     }
-    return throws
 }
 
 internal fun UMethod.methodKey() = MethodKey(this)

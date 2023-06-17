@@ -63,7 +63,12 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         hello()
         test()
-        test(1)
+        try {
+
+            test(1)
+        } catch (e: ArrayIndexOutOfBoundsException) {
+
+        }
         from()
         middle()
         throwException()
