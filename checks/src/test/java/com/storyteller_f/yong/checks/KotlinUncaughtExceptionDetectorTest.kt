@@ -15,23 +15,42 @@
  */
 package com.storyteller_f.yong.checks
 
+import com.android.tools.lint.checks.infrastructure.TestFile
 import com.android.tools.lint.checks.infrastructure.TestFiles.kotlin
 import com.android.tools.lint.checks.infrastructure.TestLintTask.lint
 import org.junit.Test
-import java.io.File
 
-@Suppress("UnstableApiUsage")
 class KotlinUncaughtExceptionDetectorTest {
-    @Test
-    fun testBasic() {
-        val home = System.getProperty("user.home")
-        val sdkHome = File(home, "Library/Android/sdk")
-        lint().files(
-            kotlin(
-                """
+    private val throwableFile = kotlin(
+        """
+            package java.lang
+            abstract class Throwable
+            abstract class Exception : Throwable
+        """.trimIndent()
+    )
+    private val ioExceptionFile = kotlin(
+        """
+            package java.io
+            import java.lang.Exception
+            abstract class IoException : Exception
+
+        """.trimIndent()
+    )
+    private val contextFile = kotlin(
+        """
+            package android.content
+            abstract class Context {
+                fun onResume()
+            }
+
+        """.trimIndent()
+    )
+    private val testFile: TestFile = kotlin(
+        """
                     package test.pkg
-                    
-                    class MainActivity : AppCompatActivity() {
+                    import java.io.IOException
+
+                    class MainActivity : android.content.Context() {
                         override fun onResume() {
                             super.onResume()
                             hello()
@@ -50,12 +69,25 @@ class KotlinUncaughtExceptionDetectorTest {
                         
                     }
                     """
-            ).indented()
-        ).sdkHome(sdkHome)
+    ).indented()
+
+    @Test
+    fun testBasic() {
+        lint().files(
+            throwableFile,
+            ioExceptionFile,
+            contextFile,
+            testFile
+        ).allowMissingSdk()
             .issues(KotlinUncaughtExceptionDetector.ISSUE)
             .run()
             .expect(
-                "No warnings."
+                """
+                    src/test/pkg/MainActivity.kt:5: Error: uncaught exception java.io.IOException [Yong]
+                        override fun onResume() {
+                        ^
+                    1 errors, 0 warnings
+                """.trimIndent()
             )
     }
 }
