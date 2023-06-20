@@ -90,4 +90,54 @@ class KotlinUncaughtExceptionDetectorTest {
                 """.trimIndent()
             )
     }
+
+    @Test
+    fun testAbstract() {
+        val content = kotlin("""
+            package test.hello
+            import java.io.IOException
+
+            abstract class Long {
+                @Throws(IOException::class)
+                fun fangShui()
+            }
+
+            class QiuNiu : Long() {
+                override fun fangShui() {
+                    
+                }
+            }
+            class YaZi : Long() {
+                override fun fangShui() {
+                
+                }
+            }
+            class ChaoFeng : Long() {
+                override fun fangShui() {
+                    
+                }
+            }
+
+            
+            fun main() {
+                //如果指定类型为Long，在语法树上，方法的receiver 就会变成Long，而不是QiuNiu
+                val long: Long = QiuNiu()
+                long.fangShui()
+            }
+            
+        """.trimIndent())
+        lint().files(
+            throwableFile,
+            ioExceptionFile,
+            content
+        ).allowMissingSdk()
+            .issues(KotlinUncaughtExceptionDetector.ISSUE)
+            .run()
+            .expect("""
+                src/test/hello/Long.kt:26: Error: uncaught exception java.io.IOException [Yong]
+                fun main() {
+                ^
+                1 errors, 0 warnings
+            """.trimIndent())
+    }
 }

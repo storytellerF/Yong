@@ -1,6 +1,8 @@
 package com.storyteller_f.yong.checks.resolution
 
 import com.android.tools.lint.detector.api.JavaContext
+import com.android.tools.lint.detector.api.Severity
+import com.android.tools.lint.detector.api.getReceiver
 import com.storyteller_f.yong.checks.ContextNode
 import com.storyteller_f.yong.checks.EntranceNode
 import com.storyteller_f.yong.checks.KotlinUncaughtExceptionDetector
@@ -29,6 +31,7 @@ import org.jetbrains.uast.UTryExpression
 import org.jetbrains.uast.kotlin.KotlinUBlockExpression
 import org.jetbrains.uast.kotlin.KotlinUFunctionCallExpression
 import org.jetbrains.uast.resolveToUElement
+import org.jetbrains.uast.util.isConstructorCall
 import org.jetbrains.uast.visitor.AbstractUastVisitor
 import java.util.Collections
 import java.util.LinkedList
@@ -68,8 +71,9 @@ class StackResolution(val context: JavaContext) {
              * 通过注解或者关键字指定的异常
              */
             val throws = keywordExceptions + constructorExceptions
+            val expressionCount = (node.uastBody as? KotlinUBlockExpression)?.expressions?.size ?: 0
             log(
-                "${stackIndent()}visitMethod ${node.name} throws count: ${throws.size} expressions count: ${(node.uastBody as? KotlinUBlockExpression)?.expressions?.size ?: 0} ${
+                "${stackIndent()}visitMethod ${node.name} throwsCount: ${throws.size} expressionsCount: $expressionCount ${node.isConstructor} ${node.getReceiver()} ${node.containingClass} ${
                     callStack.joinToString {
                         it.debug()
                     }
@@ -128,7 +132,7 @@ class StackResolution(val context: JavaContext) {
 
         override fun visitCallExpression(node: UCallExpression): Boolean {
             log(
-                "${stackIndent()}call ${node.methodName} $node"
+                "${stackIndent()}call ${node.methodName} ${node.isConstructorCall()} $node"
             )
             val current = callStack.last
             if (node is KotlinUFunctionCallExpression) {
