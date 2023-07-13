@@ -35,7 +35,10 @@ class ThrowableDefinition(val name: String, val children: MutableList<ThrowableD
     }
 
     companion object {
-        val rootDefinition = ThrowableDefinition("java.lang.throwable")
+        private val rootDefinition = ThrowableDefinition("java.lang.throwable")
+        private val supers: (PsiClass) -> List<String> = {
+            it.supers().subList(0, it.supers().size - 2)
+        }
 
         private val resolvedDefinition = mutableMapOf(rootDefinition.name to rootDefinition)
         private fun addChild(node: ThrowableDefinition, parents: List<String>) {
@@ -55,27 +58,32 @@ class ThrowableDefinition(val name: String, val children: MutableList<ThrowableD
             resolvedDefinition[node.name] = node
         }
 
-        fun throwableDefinition(psiClassType: PsiClassType) = throwableDefinition(psiClassType.resolve()!!) {
-            it.supers().subList(0, it.supers().size - 2)
-        }
+        fun throwableDefinition(psiClassType: PsiClassType) =
+            throwableDefinition(psiClassType.resolve()!!)
 
-        fun throwableDefinition(psiClass: PsiClass) = throwableDefinition(psiClass) {
-            it.supers().subList(0, it.supers().size - 2)
-        }
-
-        private fun throwableDefinition(psiClass: PsiClass, supers: (PsiClass) -> List<String>): ThrowableDefinition {
+        internal fun throwableDefinition(psiClass: PsiClass): ThrowableDefinition {
             val unrecognized = psiClass.qualifiedName!!
+            return throwableDefinition(unrecognized) {
+                supers(psiClass)
+            }
+        }
+
+        fun throwableDefinition(
+            unrecognized: String,
+            parents: () -> List<String>
+        ): ThrowableDefinition {
             val recognized = resolvedDefinition[unrecognized]
             return if (recognized != null) recognized
             else {
                 val node = ThrowableDefinition(unrecognized)
-                val parents = supers(psiClass)
-                addChild(node, parents)
+
+                addChild(node, parents())
                 node
             }
         }
 
-        internal fun printTree(node: ThrowableDefinition, context: JavaContext, step: Int) {
+
+        private fun printTree(node: ThrowableDefinition, context: JavaContext, step: Int) {
             context.client.log(
                 Severity.INFORMATIONAL,
                 null,
@@ -87,12 +95,11 @@ class ThrowableDefinition(val name: String, val children: MutableList<ThrowableD
             }
         }
 
+        @Suppress("unused")
         fun printTree(context: JavaContext) {
             if (rootDefinition.children.isNotEmpty())
                 printTree(rootDefinition, context, 0)
         }
-
-
 
     }
 }

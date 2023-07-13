@@ -18,6 +18,22 @@ fun UTryExpression.safeExceptions(): List<ThrowableDefinition> {
 fun UMethod.throwExceptions(): List<ThrowableDefinition> {
     return throwsList.referencedTypes.map {
         ThrowableDefinition.throwableDefinition(it)
+    } + fallbackExceptions()
+}
+
+const val retrofitPackage = "retrofit2.http"
+val fallbackRetrofit = listOf("GET", "POST", "DELETE", "HEAD", "PUT")
+private fun UMethod.fallbackExceptions(): List<ThrowableDefinition> {
+    return annotations.mapNotNull {
+        val qualifiedName = it.qualifiedName.orEmpty()
+        val lastDot = qualifiedName.lastIndexOf(".")
+        val packageName = qualifiedName.substring(0, lastDot)
+        val name = qualifiedName.substring(lastDot + 1)
+        if (packageName == retrofitPackage && fallbackRetrofit.contains(name)) {
+            ThrowableDefinition.throwableDefinition("java.io.IOException") {
+                listOf("java.lang.Exception", "java.lang.throwable")
+            }
+        } else null
     }
 }
 
