@@ -107,8 +107,8 @@ class MethodNode(
 }
 
 /**
- * 临时节点，用于判断当前visitMethod 是不是需要throw
- * 虽然是methodNode，但是执行的是初始化操作。
+ * 临时节点，进入visitMethod 之后会判断栈顶是不是这个node，如果是将异常信息填入
+ * 存储虽然是methodNode，但是执行的是初始化操作。
  */
 class ThrowNode(override val methods: MutableList<MethodNode> = mutableListOf()): Node(),
     MethodContainer, Throwable {

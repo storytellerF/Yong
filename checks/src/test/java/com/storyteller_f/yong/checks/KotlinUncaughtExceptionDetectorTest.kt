@@ -21,21 +21,23 @@ import com.android.tools.lint.checks.infrastructure.TestLintTask.lint
 import org.junit.Test
 
 class KotlinUncaughtExceptionDetectorTest {
-    private val throwableFile = kotlin(
-        """
+    companion object {
+        val throwableFile = kotlin(
+            """
             package java.lang
             abstract class Throwable
             abstract class Exception : Throwable
         """.trimIndent()
-    )
-    private val ioExceptionFile = kotlin(
-        """
+        )
+        val ioExceptionFile = kotlin(
+            """
             package java.io
             import java.lang.Exception
             abstract class IoException : Exception
 
         """.trimIndent()
-    )
+        )
+    }
     private val contextFile = kotlin(
         """
             package android.content
