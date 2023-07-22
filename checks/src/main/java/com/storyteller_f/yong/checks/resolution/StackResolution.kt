@@ -73,7 +73,7 @@ class StackResolution(val context: JavaContext) {
             val throws = keywordExceptions + constructorExceptions
             val expressionCount = (node.uastBody as? KotlinUBlockExpression)?.expressions?.size ?: 0
             log(
-                "${stackIndent()}visitMethod ${node.name} throwsCount: ${throws.size} expressionsCount: $expressionCount ${node.isConstructor} ${node.getReceiver()} ${node.containingClass} ${
+                "${stackIndent()}visitMethod ${node.name} throwsCount: ${throws.size} expressionsCount: $expressionCount ${node.isConstructor} ${node.getReceiver()} ${node.containingClass?.name} ${
                     callStack.joinToString {
                         it.debug()
                     }

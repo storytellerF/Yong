@@ -7,7 +7,6 @@ import org.junit.Test
 class CoroutineTest {
     private val mainScopeFile = kotlin(
         """
-        import java.io.IOException
         class MainScope {
             fun launch(block: () -> Unit) {
                 
@@ -20,6 +19,7 @@ class CoroutineTest {
     fun test() {
         val requestFile = kotlin(
             """
+            import java.io.IOException
             fun main() {
                 MainScope().launch {
                     throw IOException()
@@ -37,7 +37,7 @@ class CoroutineTest {
             .run()
             .expect(
                 """
-                    src/MainScope.kt:11: Error: uncaught exception java.io.IOException [Yong]
+                    src/test.kt:2: Error: uncaught exception java.io.IOException [Yong]
                     fun main() {
                     ^
                     1 errors, 0 warnings
