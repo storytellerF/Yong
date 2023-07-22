@@ -5,33 +5,32 @@ import com.android.tools.lint.checks.infrastructure.TestLintTask.lint
 import org.junit.Test
 
 class CoroutineTest {
+    private val mainScopeFile = kotlin(
+        """
+        import java.io.IOException
+        class MainScope {
+            fun launch(block: () -> Unit) {
+                
+            }
+        }
+    """.trimIndent()
+    )
 
     @Test
     fun test() {
         val requestFile = kotlin(
             """
-            import java.io.IOException
-            class MainScope {
-                fun launch(block: () -> Unit) {
-                    
-                }
-            }
-            @Throws(IOException)
-            fun test(){
-                
-            }
             fun main() {
                 MainScope().launch {
-                    test()
                     throw IOException()
                 }
             }
-            
-        """.trimIndent()
+            """.trimIndent()
         )
         lint().files(
             KotlinUncaughtExceptionDetectorTest.throwableFile,
             KotlinUncaughtExceptionDetectorTest.ioExceptionFile,
+            mainScopeFile,
             requestFile
         ).allowMissingSdk()
             .issues(KotlinUncaughtExceptionDetector.ISSUE)
@@ -44,5 +43,31 @@ class CoroutineTest {
                     1 errors, 0 warnings
                 """.trimIndent()
             )
+    }
+
+    @Test
+    fun testCatchException() {
+        val requestFile = kotlin(
+            """
+            fun main() {
+                MainScope().launch {
+                    try {
+                         throw IOException()
+                    } catch (e: Exception) {
+                         println(e)
+                    }
+                }
+            }
+            """.trimIndent()
+        )
+        lint().files(
+            KotlinUncaughtExceptionDetectorTest.throwableFile,
+            KotlinUncaughtExceptionDetectorTest.ioExceptionFile,
+            mainScopeFile,
+            requestFile
+        ).allowMissingSdk()
+            .issues(KotlinUncaughtExceptionDetector.ISSUE)
+            .run()
+            .expect("No warnings.")
     }
 }

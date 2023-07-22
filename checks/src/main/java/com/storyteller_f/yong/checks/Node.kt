@@ -23,6 +23,10 @@ interface Throwable {
     fun throwList(): Set<ThrowableDefinition>
 }
 
+interface ThrowableContainer {
+    val throwNodes: MutableList<ThrowNode>
+}
+
 interface Debug {
     fun debug(): String
 
@@ -74,14 +78,18 @@ class ContextNode(
     }
 }
 
+/**
+ * @param declareThrows 使用注解生命的异常
+ * @param throwNodes 使用throw 关键字在方法体中抛出的异常
+ */
 class MethodNode(
     override val name: String,
     val key: MethodKey,
     private val declareThrows: MutableList<ThrowableDefinition> = mutableListOf(),
-    val throwNodes: MutableList<ThrowNode> = mutableListOf(),
+    override val throwNodes: MutableList<ThrowNode> = mutableListOf(),
     val tryBlock: MutableList<TryCatchSubstitution> = mutableListOf(),
     override val methods: MutableList<MethodNode> = mutableListOf(),
-) : Node(), Named, MethodContainer, Throwable{
+) : Node(), Named, MethodContainer, Throwable, ThrowableContainer {
     override fun debug(): String {
         return "Method($name)"
     }
@@ -125,8 +133,9 @@ class ThrowNode(override val methods: MutableList<MethodNode> = mutableListOf())
 
 class TryCatchSubstitution(
     private val caught: MutableList<ThrowableDefinition>,
+    override val throwNodes: MutableList<ThrowNode> = mutableListOf(),
     override val methods: MutableList<MethodNode> = mutableListOf(),
-) : Node(), MethodContainer, Throwable {
+) : Node(), MethodContainer, Throwable, ThrowableContainer {
     override fun debug(): String {
         return "Caught(${
             caught.joinToString {
@@ -148,7 +157,9 @@ class TryCatchSubstitution(
     override fun throwList(): Set<ThrowableDefinition> {
         val throws = methods.flatMap { methodNode ->
             methodNode.throwList()
-        }.toSet()
+        }.toSet() + throwNodes.flatMap {
+            it.throwList()
+        }
         val caught = caught.toSet()
         return throws.filter {
             !caught.any { parent ->

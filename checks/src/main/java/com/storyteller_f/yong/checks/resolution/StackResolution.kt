@@ -1,7 +1,6 @@
 package com.storyteller_f.yong.checks.resolution
 
 import com.android.tools.lint.detector.api.JavaContext
-import com.android.tools.lint.detector.api.Severity
 import com.android.tools.lint.detector.api.getReceiver
 import com.storyteller_f.yong.checks.ContextNode
 import com.storyteller_f.yong.checks.EntranceNode
@@ -13,6 +12,7 @@ import com.storyteller_f.yong.checks.Node
 import com.storyteller_f.yong.checks.RootNode
 import com.storyteller_f.yong.checks.ThrowNode
 import com.storyteller_f.yong.checks.Throwable
+import com.storyteller_f.yong.checks.ThrowableContainer
 import com.storyteller_f.yong.checks.ThrowableDefinition
 import com.storyteller_f.yong.checks.TryCatchSubstitution
 import com.storyteller_f.yong.checks.indent
@@ -95,6 +95,7 @@ class StackResolution(val context: JavaContext) {
                 (last as MethodContainer).methods.add(methodNode)
 
             //如果返回true，afterVisitMethod 也会跳过
+            //没有抛出异常或者曾经遍历过
             if (throws.isNotEmpty() || cache != null) return true
             callStack.addLast(methodNode)
 
@@ -159,7 +160,7 @@ class StackResolution(val context: JavaContext) {
             )
             val current = callStack.last
             val throwNode = ThrowNode()
-            (current as MethodNode).throwNodes.add(throwNode)
+            (current as ThrowableContainer).throwNodes.add(throwNode)
             callStack.addLast(throwNode)
             return super.visitThrowExpression(node)
         }
