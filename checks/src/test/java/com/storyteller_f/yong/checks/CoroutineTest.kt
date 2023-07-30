@@ -28,8 +28,8 @@ class CoroutineTest {
             """.trimIndent()
         )
         lint().files(
-            KotlinUncaughtExceptionDetectorTest.throwableFile,
-            KotlinUncaughtExceptionDetectorTest.ioExceptionFile,
+            KotlinUncaughtExceptionTest.throwableFile,
+            KotlinUncaughtExceptionTest.ioExceptionFile,
             mainScopeFile,
             requestFile
         ).allowMissingSdk()
@@ -61,8 +61,8 @@ class CoroutineTest {
             """.trimIndent()
         )
         lint().files(
-            KotlinUncaughtExceptionDetectorTest.throwableFile,
-            KotlinUncaughtExceptionDetectorTest.ioExceptionFile,
+            KotlinUncaughtExceptionTest.throwableFile,
+            KotlinUncaughtExceptionTest.ioExceptionFile,
             mainScopeFile,
             requestFile
         ).allowMissingSdk()

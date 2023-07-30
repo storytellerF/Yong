@@ -18,8 +18,22 @@ fun UTryExpression.safeExceptions(): List<ThrowableDefinition> {
 fun UMethod.throwExceptions(): List<ThrowableDefinition> {
     return throwsList.referencedTypes.map {
         ThrowableDefinition.throwableDefinition(it)
-    } + fallbackExceptions()
+    } + fallbackExceptions() + topSetThrows()
 }
+
+fun UMethod.topSetThrows() =
+    containingClass?.annotations?.mapNotNull {
+        val qualifiedName = it.qualifiedName.orEmpty()
+        if (qualifiedName == com.storyteller_f.yong.definition.Throws::class.qualifiedName) {
+            it.parameterList.attributes.mapNotNull { pair ->
+                pair.value?.text
+            }.map {
+                ThrowableDefinition.throwableDefinition(it) {
+                    listOf("java.lang.throwable")
+                }
+            }
+        } else null
+    }.orEmpty().flatten()
 
 const val retrofitPackage = "retrofit2.http"
 val fallbackRetrofit = listOf("GET", "POST", "DELETE", "HEAD", "PUT")

@@ -5,7 +5,7 @@ import com.android.tools.lint.detector.api.Severity
 import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiClassType
 
-class ThrowableDefinition(val name: String, val children: MutableList<ThrowableDefinition> = mutableListOf()) {
+data class ThrowableDefinition(val name: String, val children: MutableList<ThrowableDefinition> = mutableListOf()) {
 
     fun hasChild(node: ThrowableDefinition): Boolean {
         return children.any {
@@ -17,21 +17,6 @@ class ThrowableDefinition(val name: String, val children: MutableList<ThrowableD
 
     fun addChild(node: ThrowableDefinition) {
         children.add(node)
-    }
-
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (javaClass != other?.javaClass) return false
-
-        other as ThrowableDefinition
-
-        if (name != other.name) return false
-
-        return true
-    }
-
-    override fun hashCode(): Int {
-        return name.hashCode()
     }
 
     companion object {
