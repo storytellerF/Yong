@@ -22,7 +22,6 @@ dependencies {
     testImplementation "com.android.tools.lint:lint:$lintVersion"
     testImplementation "com.android.tools.lint:lint-tests:$lintVersion"
 
-    implementation(project(":definition"))
 }
 
 sourceCompatibility = "17"

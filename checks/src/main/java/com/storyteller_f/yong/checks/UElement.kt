@@ -24,7 +24,7 @@ fun UMethod.throwExceptions(): List<ThrowableDefinition> {
 fun UMethod.topSetThrows() =
     containingClass?.annotations?.mapNotNull {
         val qualifiedName = it.qualifiedName.orEmpty()
-        if (qualifiedName == com.storyteller_f.yong.definition.Throws::class.qualifiedName) {
+        if (qualifiedName == "com.storyteller_f.yong.definition.Throws") {
             it.parameterList.attributes.mapNotNull { pair ->
                 pair.value?.text
             }.map {
