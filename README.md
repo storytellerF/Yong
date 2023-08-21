@@ -2,14 +2,16 @@
 
 [![](https://jitpack.io/v/storytellerF/Yong.svg)](https://jitpack.io/#storytellerF/Yong)
 
-lint your kotlin uncaught exceptions. 
+[EN](README-EN.md)
+
+使用lint 检查未经捕获的异常。
 
 ```groovy
 maven { url 'https://jitpack.io' }
 ```
 
 ```groovy
-implementation 'com.github.storytellerF:Yong:1.1'
+implementation 'com.github.storytellerF:Yong:1.2'
 ```
 
 支持处理的类型包括
