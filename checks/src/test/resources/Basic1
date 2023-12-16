@@ -1,0 +1,25 @@
+package test.pkg
+import java.io.IOException
+
+class MainActivity : android.content.Context() {
+
+    private val test by lazy {
+        "hello"
+    }
+    override fun onResume() {
+        super.onResume()
+        hello()
+        middle()
+        throwException()
+    }
+
+    @Throws(IOException::class)
+    fun throwException() = Unit
+
+    fun middle() = throwException()
+
+    fun hello() = try {
+        middle()
+    } catch (_: IOException) { }
+
+}

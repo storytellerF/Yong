@@ -19,6 +19,7 @@ import com.android.tools.lint.checks.infrastructure.TestFile
 import com.android.tools.lint.checks.infrastructure.TestFiles.kotlin
 import com.android.tools.lint.checks.infrastructure.TestLintTask.lint
 import org.junit.Test
+import java.io.File
 
 class KotlinUncaughtExceptionTest {
     companion object {
@@ -38,6 +39,7 @@ class KotlinUncaughtExceptionTest {
         """.trimIndent()
         )
     }
+
     private val contextFile = kotlin(
         """
             package android.content
@@ -47,34 +49,12 @@ class KotlinUncaughtExceptionTest {
 
         """.trimIndent()
     )
-    private val testFile: TestFile = kotlin(
-        """
-                    package test.pkg
-                    import java.io.IOException
 
-                    class MainActivity : android.content.Context() {
-                        override fun onResume() {
-                            super.onResume()
-                            hello()
-                            middle()
-                            throwException()
-                        }
-                        
-                        @Throws(IOException::class)
-                        fun throwException() = Unit
-
-                        fun middle() = throwException()
-                    
-                        fun hello() = try {
-                            middle()
-                        } catch (_: IOException) { }
-                        
-                    }
-                    """
-    ).indented()
 
     @Test
     fun testBasic() {
+        val testFile: TestFile =
+            kotlin(File("src/test/resources/Basic1").readText().replace("\r", "")).indented()
         lint().files(
             throwableFile,
             ioExceptionFile,
@@ -85,7 +65,7 @@ class KotlinUncaughtExceptionTest {
             .run()
             .expect(
                 """
-                    src/test/pkg/MainActivity.kt:5: Error: uncaught exception java.io.IOException [Yong]
+                    src/test/pkg/MainActivity.kt:9: Error: uncaught exception java.io.IOException [Yong]
                         override fun onResume() {
                         ^
                     1 errors, 0 warnings
@@ -95,39 +75,7 @@ class KotlinUncaughtExceptionTest {
 
     @Test
     fun testAbstract() {
-        val content = kotlin("""
-            package test.hello
-            import java.io.IOException
-
-            abstract class Long {
-                @Throws(IOException::class)
-                fun fangShui()
-            }
-
-            class QiuNiu : Long() {
-                override fun fangShui() {
-                    
-                }
-            }
-            class YaZi : Long() {
-                override fun fangShui() {
-                
-                }
-            }
-            class ChaoFeng : Long() {
-                override fun fangShui() {
-                    
-                }
-            }
-
-            
-            fun main() {
-                //如果指定类型为Long，在语法树上，方法的receiver 就会变成Long，而不是QiuNiu
-                val long: Long = QiuNiu()
-                long.fangShui()
-            }
-            
-        """.trimIndent())
+        val content = kotlin(File("src/test/resources/Abstract").readText().replace("\r", ""))
         lint().files(
             throwableFile,
             ioExceptionFile,
@@ -135,11 +83,13 @@ class KotlinUncaughtExceptionTest {
         ).allowMissingSdk()
             .issues(KotlinUncaughtExceptionDetector.ISSUE)
             .run()
-            .expect("""
-                src/test/hello/Long.kt:26: Error: uncaught exception java.io.IOException [Yong]
-                fun main() {
-                ^
-                1 errors, 0 warnings
-            """.trimIndent())
+            .expect(
+                """
+                    src/test/hello/Long.kt:26: Error: uncaught exception java.io.IOException [Yong]
+                    fun main() {
+                    ^
+                    1 errors, 0 warnings
+                """.trimIndent()
+            )
     }
 }

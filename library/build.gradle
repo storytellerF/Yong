@@ -18,6 +18,6 @@ android {
 
 /** Package the given lint checks library into this AAR  */
 dependencies {
-    implementation project(':checks')
-    lintPublish project(':checks')
+    implementation project(parent.path + ":checks")
+    lintPublish project(parent.path + ':checks')
 }

@@ -44,15 +44,20 @@ class KotlinUncaughtExceptionDetector : Detector(), UastScanner {
         return object : UElementHandler() {
 
             override fun visitClass(node: UClass) {
-                val isLogicalContext = node.isLogicalContext()
-                val hasMainMethod = node.methods.any {
-                    it.isMainMethod()
+                try {
+                    val isLogicalContext = node.isLogicalContext()
+                    val hasMainMethod = node.methods.any {
+                        it.isMainMethod()
+                    }
+                    if (isLogicalContext) {
+                        resolution.start(node)
+                    } else if (hasMainMethod) {
+                        resolution.start(node)
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
                 }
-                if (isLogicalContext) {
-                    resolution.start(node)
-                } else if (hasMainMethod) {
-                    resolution.start(node)
-                }
+
 
             }
         }
