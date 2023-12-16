@@ -234,7 +234,7 @@ class StackResolution(val context: JavaContext) {
 
     }
 
-    private fun log(format: String) {
+    private fun log(@Suppress("UNUSED_PARAMETER") format: String) {
 //        context.client.log(Severity.IGNORE, null, format)
     }
 

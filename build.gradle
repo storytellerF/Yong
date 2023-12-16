@@ -1,8 +1,8 @@
 buildscript {
     ext {
-        kotlinVersion = '1.8.21'
-        gradlePluginVersion = '8.0.2'
-        lintVersion = '31.0.2'
+        kotlinVersion = '1.9.21'
+        gradlePluginVersion = '8.2.0'
+        lintVersion = '31.2.0'
     }
 
     repositories {

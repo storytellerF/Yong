@@ -3,6 +3,7 @@ package com.storyteller_f.yong.checks
 import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiClassType
 import com.intellij.psi.PsiType
+import com.intellij.psi.PsiTypes
 import org.jetbrains.uast.UClass
 import org.jetbrains.uast.UMethod
 import org.jetbrains.uast.UTryExpression
@@ -27,8 +28,8 @@ fun UMethod.topSetThrows() =
         if (qualifiedName == "com.storyteller_f.yong.definition.Throws") {
             it.parameterList.attributes.mapNotNull { pair ->
                 pair.value?.text
-            }.map {
-                ThrowableDefinition.throwableDefinition(it) {
+            }.map { exceptionName ->
+                ThrowableDefinition.throwableDefinition(exceptionName) {
                     listOf("java.lang.throwable")
                 }
             }
@@ -54,7 +55,7 @@ private fun UMethod.fallbackExceptions(): List<ThrowableDefinition> {
 internal fun UMethod.methodKey() = MethodKey(this)
 
 internal fun UMethod.isMainMethod() =
-    name == "main" && isStatic && returnType == PsiType.VOID
+    name == "main" && isStatic && returnType == PsiTypes.voidType()
 
 internal fun PsiClass.supers(): MutableList<String> {
     val list = mutableListOf<String>()
